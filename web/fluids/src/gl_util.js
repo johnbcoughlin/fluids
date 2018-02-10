@@ -37,3 +37,30 @@ export const createProgram = (gl, vertexShader, fragmentShader) => {
   console.log(gl.getProgramInfoLog(program));
   gl.deleteProgram(program);
 };
+
+export const checkFramebuffer = (gl) => {
+  const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+  switch (status) {
+    case gl.FRAMEBUFFER_INCOMPLETE:
+      console.log("Framebuffer is ready to go");
+      return;
+    case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+      console.log("gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT");
+      return;
+    case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+      console.log("gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT");
+      return;
+    case gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS:
+      console.log("gl.FRAMEBUFFER_INCOMPLETE_DIMENSIONS");
+      return;
+    case gl.FRAMEBUFFER_UNSUPPORTED:
+      console.log("gl.FRAMEBUFFER_UNSUPPORTED");
+      return;
+    case gl.FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+      console.log("gl.FRAMEBUFFER_INCOMPLETE_MULTISAMPLE");
+      return;
+    case gl.RENDERBUFFER_SAMPLES:
+      console.log("gl.RENDERBUFFER_SAMPLES");
+      return;
+  }
+};

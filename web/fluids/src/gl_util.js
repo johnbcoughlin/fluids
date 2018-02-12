@@ -85,4 +85,4 @@ export const resizeCanvasToDisplaySize = (canvas, multiplier) => {
     return true;
   }
   return false;
-}
+};

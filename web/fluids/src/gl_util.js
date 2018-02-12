@@ -41,7 +41,7 @@ export const createProgram = (gl, vertexShader, fragmentShader) => {
 export const checkFramebuffer = (gl) => {
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   switch (status) {
-    case gl.FRAMEBUFFER_INCOMPLETE:
+    case gl.FRAMEBUFFER_COMPLETE:
       console.log("Framebuffer is ready to go");
       return;
     case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
@@ -62,5 +62,27 @@ export const checkFramebuffer = (gl) => {
     case gl.RENDERBUFFER_SAMPLES:
       console.log("gl.RENDERBUFFER_SAMPLES");
       return;
+    default:
+      console.log("unknown enum value " + status);
   }
 };
+
+/**
+ * Resize a canvas to match the size its displayed.
+ * @param {HTMLCanvasElement} canvas The canvas to resize.
+ * @param {number} [multiplier] amount to multiply by.
+ *    Pass in window.devicePixelRatio for native pixels.
+ * @return {boolean} true if the canvas was resized.
+ * @memberOf module:webgl-utils
+ */
+export const resizeCanvasToDisplaySize = (canvas, multiplier) => {
+  multiplier = multiplier || 1;
+  var width  = canvas.clientWidth  * multiplier | 0;
+  var height = canvas.clientHeight * multiplier | 0;
+  if (canvas.width !== width ||  canvas.height !== height) {
+    canvas.width  = width;
+    canvas.height = height;
+    return true;
+  }
+  return false;
+}

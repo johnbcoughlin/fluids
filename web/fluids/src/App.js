@@ -91,7 +91,6 @@ class App extends Component {
 
     // draw
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
   }
 
   setupCanvasRenderingStage(gl, program) {
@@ -131,13 +130,13 @@ class App extends Component {
     const texcoordBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, texcoordBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        0, dy * dy,
-        dx * nx, dy * ny,
-        dx * nx, 0,
+        0, 1,
+        1, 1,
+        1, 0,
 
         0, 0,
-        dx * nx, 0,
-        0, dy * ny
+        1, 0,
+        0, 1
     ]), gl.STATIC_DRAW);
     const texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
     gl.enableVertexAttribArray(texcoordLocation);
@@ -151,9 +150,9 @@ class App extends Component {
     const velocityTextureA = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, velocityTextureA);
 
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny+1, 0, gl.RED, gl.FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1 + dy, 0, gl.RED, gl.FLOAT, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -162,9 +161,9 @@ class App extends Component {
     const velocityTextureB = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, velocityTextureB);
 
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny+1, 0, gl.RED, gl.FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 1, 1 + dy, 0, gl.RED, gl.FLOAT, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -194,7 +193,8 @@ class App extends Component {
     const positions = [];
     for (let i = 0; i < nx; i++) {
       for (let j = 0; j < ny + 1; j++) {
-        positions.push(i * dx, j * dy);
+        // staggered grid
+        positions.push(i * dx, (j - 0.5) * dy);
       }
     }
     console.log(positions);
@@ -229,7 +229,8 @@ varying vec2 v_texcoord;
 uniform sampler2D u_texture;
 
 void main() {
-  gl_FragColor = texture2D(u_texture, v_texcoord);
+  float velocityY = texture2D(u_texture, v_texcoord).x;
+  gl_FragColor = vec4(velocityY, 0.0, velocityY, 1.0);
 }
 `;
 
@@ -251,9 +252,10 @@ in vec2 v_texcoord;
 
 uniform sampler2D velocityYTexture;
  
-out vec4 outColor;
+out float new_velocityY;
 
 void main() {
-  outColor = vec4(0.0, 1.0, 0.0, 1.0);
+  float velocityY = texture(velocityYTexture, v_texcoord).x;
+  new_velocityY = velocityY + v_texcoord.y;
 }
 `;

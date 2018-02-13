@@ -38,6 +38,11 @@ export const createProgram = (gl, vertexShader, fragmentShader) => {
   gl.deleteProgram(program);
 };
 
+export const renderToCanvas = (gl) => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+};
+
 export const checkFramebuffer = (gl) => {
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   switch (status) {

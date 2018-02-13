@@ -2,8 +2,8 @@ import React, {Component} from 'react';
 import logo from './logo.svg';
 import './App.css';
 import {loadShader} from "./gl_util.js";
-import {resizeCanvasToDisplaySize, checkFramebuffer, createProgram} from "./gl_util";
-import {glStateDump} from "./gl_state_dump";
+import {resizeCanvasToDisplaySize, checkFramebuffer, createProgram, renderToCanvas} from "./gl_util";
+import {TwoPhaseRenderTarget} from "./lib/body_forces";
 
 const n = 500;
 const nx = n;
@@ -67,35 +67,54 @@ class App extends Component {
     gl.viewport(0, 0, nx, ny);
     gl.useProgram(velocityYProgram);
     const velocityYSetup = this.setupVelocityRenderStage(gl, velocityYProgram);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, velocityYSetup.velocityFramebuffer);
+    gl.bindVertexArray(velocityYSetup.vao);
+    velocityYSetup.velocityYRenderTarget.renderFromA(velocityYSetup.velocityYUniformLocation);
+    velocityYSetup.velocityYRenderTarget.renderToB();
     // Clear the canvas
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniform1i(velocityYSetup.velocityYUniformLocation, 0);
-    gl.bindTexture(gl.TEXTURE_2D, velocityYSetup.velocityTextureA);
 
     checkFramebuffer(gl);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, velocityYSetup.positions.length / 2);
 
 
-    // Tell WebGL how to convert from clip space to pixels
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.useProgram(canvasProgram);
     const canvasSetup = this.setupCanvasRenderingStage(gl, canvasProgram);
-    // Now render to the canvas.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindVertexArray(canvasSetup.vao);
+    velocityYSetup.velocityYRenderTarget.renderFromB(canvasSetup.uniformTextureLocation);
+    renderToCanvas(gl);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniform1i(canvasSetup.uniformTextureLocation, 0);
-    gl.bindTexture(gl.TEXTURE_2D, velocityYSetup.velocityTextureB);
 
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // try to do the texture swap
+    gl.useProgram(velocityYProgram);
+    gl.bindVertexArray(velocityYSetup.vao);
+    velocityYSetup.velocityYRenderTarget.renderFromB(velocityYSetup.velocityYUniformLocation);
+    velocityYSetup.velocityYRenderTarget.renderToA();
+    checkFramebuffer(gl);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, velocityYSetup.positions.length / 2);
+
+    // Tell WebGL how to convert from clip space to pixels
+    gl.useProgram(canvasProgram);
+    gl.bindVertexArray(canvasSetup.vao);
+    // Now render to the canvas.
+    velocityYSetup.velocityYRenderTarget.renderFromA(canvasSetup.uniformTextureLocation);
+    renderToCanvas(gl);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
   setupCanvasRenderingStage(gl, program) {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
     this.setupPositions(gl, program);
+    gl.bindVertexArray(null);
     const uniformTextureLocation = gl.getUniformLocation(program, "u_texture");
     return {
+      vao,
       uniformTextureLocation,
     }
   }
@@ -131,43 +150,63 @@ class App extends Component {
   }
 
   setupVelocityRenderStage(gl, program) {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
     const positions = this.setVelocityYPositions(gl, program);
-    gl.activeTexture(gl.TEXTURE0);
+    gl.bindVertexArray(null);
+    const velocityYRenderTarget = new TwoPhaseRenderTarget(gl, gl.TEXTURE0, 0, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }, nx, ny);
+    // gl.activeTexture(gl.TEXTURE0);
+    //
+    // const velocityTextureA = gl.createTexture();
+    // gl.bindTexture(gl.TEXTURE_2D, velocityTextureA);
+    //
+    // // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    //
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, null);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //
+    // const velocityTextureB = gl.createTexture();
+    // gl.bindTexture(gl.TEXTURE_2D, velocityTextureB);
+    //
+    // // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    //
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, null);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //
+    // // create two framebuffers for us to render between textures
+    // const velocityFramebufferA = gl.createFramebuffer();
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, velocityFramebufferA);
+    // // bind velocityTextureB to the framebuffer
+    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, velocityTextureB, 0);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    //
+    // const velocityFramebufferB = gl.createFramebuffer();
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, velocityFramebufferB);
+    // // bind velocityTextureA to the framebuffer
+    // gl.bindTexture(gl.TEXTURE_2D, velocityTextureA);
+    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, velocityTextureA, 0);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    const velocityTextureA = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, velocityTextureA);
-
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-    const velocityTextureB = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, velocityTextureB);
-
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, nx, ny, 0, gl.RED, gl.FLOAT, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-    // create a framebuffer for us to render between textures
-    const velocityFramebuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, velocityFramebuffer);
-    // bind velocityTextureB to the framebuffer
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, velocityTextureB, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     const velocityYUniformLocation = gl.getUniformLocation(program, "velocityYTexture");
     return {
-      velocityFramebuffer,
-      velocityTextureA,
-      velocityTextureB,
+      vao,
+      // velocityFramebufferA,
+      // velocityTextureA,
+      // velocityFramebufferB,
+      // velocityTextureB,
       velocityYUniformLocation,
       positions,
+      velocityYRenderTarget
     }
   }
 
@@ -243,6 +282,10 @@ out float new_velocityY;
 
 void main() {
   float velocityY = texture(velocityYTexture, velocityY_texcoord).x;
-  new_velocityY = 1.0 - (velocityY_texcoord.x + velocityY_texcoord.y) * 0.5;
+  if (velocityY == 0.0) {
+    new_velocityY = 0.4;
+  } else {
+    new_velocityY = 0.9;
+  }
 }
 `;

@@ -10,6 +10,7 @@ export class BodyForcesRender {
   dy;
   dt;
   g;
+  waterMask;
   velocityY;
 
   program;
@@ -17,7 +18,7 @@ export class BodyForcesRender {
   positions;
   uniformTextureLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, g, velocityY) {
+  constructor(gl, nx, dx, ny, dy, dt, g, waterMask, velocityY) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -25,6 +26,7 @@ export class BodyForcesRender {
     this.dy = dy;
     this.dt = dt;
     this.g = g;
+    this.waterMask = waterMask;
     this.velocityY = velocityY;
     this.initialize(gl);
   }
@@ -41,6 +43,7 @@ export class BodyForcesRender {
     this.setupPositions(gl, this.program);
     gl.bindVertexArray(null);
 
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "velocityYTexture");
 
     gl.uniform1f(gl.getUniformLocation(this.program, "dt"), false, this.dt);
@@ -71,6 +74,7 @@ export class BodyForcesRender {
 
   render() {
     this.gl.useProgram(this.program);
+    this.waterMask.renderFromA(this.waterMaskLocation);
     this.velocityY.renderFromA(this.uniformTextureLocation);
     this.velocityY.renderToB();
     this.gl.bindVertexArray(this.vao);
@@ -95,12 +99,14 @@ export class BodyForcesRender {
 const velocityYVertexShaderSource = `#version 300 es
 in vec4 velocityYGridcoords;
 
+out vec2 v_velocityYGridcoords;
 out vec2 velocityYTexcoords;
 
 uniform mat4 toVelocityYClipcoords;
 uniform mat4 toVelocityYTexcoords;
 
 void main() {
+  v_velocityYGridcoords = velocityYGridcoords.xy;
   velocityYTexcoords = (toVelocityYTexcoords * velocityYGridcoords).xy;
   gl_Position = toVelocityYClipcoords * velocityYGridcoords;
   gl_PointSize = 1.0;
@@ -110,16 +116,25 @@ void main() {
 const velocityYFragmentShaderSource = `#version 300 es
 precision mediump float;
 
+in vec2 v_velocityYGridcoords;
 in vec2 velocityYTexcoords;
 
 uniform float dt;
 uniform float g;
 uniform sampler2D velocityYTexture;
+uniform lowp usampler2D waterMask;
  
 out float new_velocityY;
 
 void main() {
-  float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
-  new_velocityY = velocityY + g * dt;
+  uint water_up = texture(waterMask, v_velocityYGridcoords).x;
+  uint water_down = texture(waterMask, v_velocityYGridcoords - vec2(1.0, 0.0)).x;
+  if (water_up > uint(0) && water_down > uint(0)) {
+    float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
+    // new_velocityY = velocityY + g * dt;
+    new_velocityY = 0.9;
+  } else {
+    new_velocityY = 0.0;
+  }
 }
 `;

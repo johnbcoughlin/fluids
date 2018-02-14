@@ -13,6 +13,9 @@ export class GPUFluid {
   dt;
   g;
 
+  // masks and indicators
+  waterMask;
+
   // render targets
   velocityX;
   velocityY;
@@ -37,28 +40,41 @@ export class GPUFluid {
   }
 
   initialize(gl) {
-    this.velocityX = new TwoPhaseRenderTarget(gl, gl.TEXTURE0, 0, () => {
+    this.waterMask = new TwoPhaseRenderTarget(gl, gl.TEXTURE0, 0, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 4, 4, 0, gl.RED, gl.UNSIGNED_BYTE,
+          new Uint8Array([
+              0, 0, 0, 0,
+              0, 1, 1, 0,
+              0, 1, 1, 0,
+              0, 0, 0, 0
+          ]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    });
+
+    this.velocityX = new TwoPhaseRenderTarget(gl, gl.TEXTURE3, 3, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx+1, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }, this.nx+1, this.ny);
 
-    this.velocityY = new TwoPhaseRenderTarget(gl, gl.TEXTURE1, 1, () => {
+    this.velocityY = new TwoPhaseRenderTarget(gl, gl.TEXTURE4, 4, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny+1, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }, this.nx, this.ny+1);
 
-    this.divergence = new TwoPhaseRenderTarget(gl, gl.TEXTURE2, 2, () => {
+    this.divergence = new TwoPhaseRenderTarget(gl, gl.TEXTURE5, 5, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.pressure = new TwoPhaseRenderTarget(gl, gl.TEXTURE3, 3, () => {
+    this.pressure = new TwoPhaseRenderTarget(gl, gl.TEXTURE6, 6, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -66,7 +82,7 @@ export class GPUFluid {
     }, this.nx, this.ny);
 
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
-        this.g, this.velocityY);
+        this.g, this.waterMask, this.velocityY);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.ny, this.divergence,
         this.velocityX, this.velocityY);
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
@@ -76,6 +92,6 @@ export class GPUFluid {
   render() {
     this.bodyForcesRender.render();
     this.divergenceRender.render();
-    this.canvasRender.render();
+    this.canvasRender.render2();
   }
 }

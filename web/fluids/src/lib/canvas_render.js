@@ -80,7 +80,7 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.velocityY.renderFromA(this.uniformTextureLocation);
+    this.velocityY.renderFromB(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);

@@ -9,19 +9,22 @@ export class BodyForcesRender {
   ny;
   dy;
   dt;
+  g;
   velocityY;
 
   program;
   vao;
+  positions;
   uniformTextureLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, velocityY) {
+  constructor(gl, nx, dx, ny, dy, dt, g, velocityY) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
     this.ny = ny;
     this.dy = dy;
     this.dt = dt;
+    this.g = g;
     this.velocityY = velocityY;
     this.initialize(gl);
   }
@@ -40,6 +43,8 @@ export class BodyForcesRender {
 
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "velocityYTexture");
 
+    gl.uniform1f(gl.getUniformLocation(this.program, "dt"), false, this.dt);
+    gl.uniform1f(gl.getUniformLocation(this.program, "g"), false, this.g);
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toVelocityYClipcoords"),
         false, toVelocityYClipcoords(this.nx, this.ny));
@@ -52,13 +57,12 @@ export class BodyForcesRender {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityYGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];
-    for (let i = 0; i < this.nx; i++) {
+    for (let i = 0; i < this.nx-1; i++) {
       for (let j = 0; j < this.ny+1; j++) {
         // staggered grid
         this.positions.push(i, j, i+1, j);
       }
     }
-    console.log(this.positions);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(positionAttributeLocation);
@@ -108,16 +112,14 @@ precision mediump float;
 
 in vec2 velocityYTexcoords;
 
+uniform float dt;
+uniform float g;
 uniform sampler2D velocityYTexture;
  
 out float new_velocityY;
 
 void main() {
   float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
-  if (velocityY == 0.0) {
-    new_velocityY = 0.4;
-  } else {
-    new_velocityY = 0.9;
-  }
+  new_velocityY = velocityY + g * dt;
 }
 `;

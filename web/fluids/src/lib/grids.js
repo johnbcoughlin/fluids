@@ -20,7 +20,7 @@ export const toVelocityXClipcoords = (nx, ny) => {
   return toGridClipcoords(nx + 1, ny);
 };
 
-export const toVelocityXGridcoords = (nx, ny) => {
+export const toVelocityXTexcoords = (nx, ny) => {
   return toGridTexcoords(nx + 1, ny);
 };
 

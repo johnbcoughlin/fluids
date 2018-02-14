@@ -1,19 +1,25 @@
-
 import {createProgram, loadShader, renderToCanvas} from "../gl_util";
+import {toGridClipcoords, toGridTexcoords} from "./grids";
 
 export class CanvasRender {
   gl;
+  nx;
+  ny;
   velocityX;
   velocityY;
+  divergence;
 
   program;
   vao;
   uniformTextureLocation;
 
-  constructor(gl, velocityX, velocityY) {
+  constructor(gl, nx, ny, velocityX, velocityY, divergence) {
     this.gl = gl;
+    this.nx = nx;
+    this.ny = ny;
     this.velocityX = velocityX;
     this.velocityY = velocityY;
+    this.divergence = divergence;
     this.initialize(gl);
   }
 
@@ -30,6 +36,13 @@ export class CanvasRender {
     gl.bindVertexArray(null);
 
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "u_texture");
+
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toGridClipcoords"),
+        false, toGridClipcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toGridTexcoords"),
+        false, toGridTexcoords(this.nx, this.ny));
   }
 
   setupPositions(gl, program) {
@@ -37,31 +50,26 @@ export class CanvasRender {
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       // top right triangle
-      -1, 1, 0, 1,
-      1, 1, 1, 1,
-      1, -1, 1, 0,
+      0, this.ny,
+      this.nx, this.ny,
+      this.nx, 0,
 
       // bottom left triangle
-      -1, -1, 0, 0,
-      1, -1, 1, 0,
-      -1, 1, 0, 1
+      0, 0,
+      this.nx, 0,
+      0, this.ny
     ]), gl.STATIC_DRAW);
 
-    const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+    const positionAttributeLocation = gl.getAttribLocation(program, "a_gridcoords");
     // Turn on the attribute
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.vertexAttribPointer(
-        positionAttributeLocation, 2, gl.FLOAT, false, 4 * Float32Array.BYTES_PER_ELEMENT, 0);
-
-    const texcoordLocation = gl.getAttribLocation(program, "a_texcoord");
-    gl.enableVertexAttribArray(texcoordLocation);
-    gl.vertexAttribPointer(
-        texcoordLocation, 2, gl.FLOAT, false, 4 * Float32Array.BYTES_PER_ELEMENT, 2 * Float32Array.BYTES_PER_ELEMENT);
+        positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityY.renderFromB(this.uniformTextureLocation);
+    this.divergence.renderFromA(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -83,28 +91,31 @@ export class CanvasRender {
 }
 
 const canvasVertexShaderSource = `#version 300 es
-in vec4 a_position;
-in vec2 a_texcoord;
+in vec4 a_gridcoords;
 
-out vec2 foo;
+out vec4 v_gridcoords;
+
+uniform mat4 toGridClipcoords;
 
 void main() {
-  foo = a_texcoord;
-  gl_Position = a_position;
+  v_gridcoords = a_gridcoords;
+  gl_Position = toGridClipcoords * a_gridcoords;
 }
 `;
 
 const canvasFragmentShaderSource = `#version 300 es
 precision mediump float;
 
-in vec2 foo;
+in vec4 v_gridcoords;
 
 out vec4 outColor;
 
+uniform mat4 toGridTexcoords;
 uniform sampler2D u_texture;
 
 void main() {
-  float velocityY = texture(u_texture, foo).x;
+  vec4 texcoords = toGridTexcoords * v_gridcoords;
+  float velocityY = texture(u_texture, texcoords.xy).x;
   outColor = vec4(velocityY, velocityY, 0.0, 1.0);
 }
 `;

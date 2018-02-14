@@ -1,7 +1,81 @@
-import {createProgram, loadShader, renderToCanvas} from "../gl_util";
+import {createProgram, loadShader} from "../gl_util";
+import {toGridClipcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
 
 export class DivergenceRender {
+  gl;
+  nx;
+  ny;
+  divergence;
+  velocityX;
+  velocityY;
 
+  program;
+  vao;
+  gridcoords;
+  uniformVelocityXTextureLocation;
+  uniformVelocityYTextureLocation;
+
+  constructor(gl, nx, ny, divergence, velocityX, velocityY) {
+    this.gl = gl;
+    this.nx = nx;
+    this.ny = ny;
+    this.divergence = divergence;
+    this.velocityX = velocityX;
+    this.velocityY = velocityY;
+    this.initialize(gl);
+  }
+
+  initialize(gl) {
+    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+    this.program = createProgram(gl, vertexShader, fragmentShader);
+
+    gl.useProgram(this.program);
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    this.setupPositions(gl, this.program);
+    gl.bindVertexArray(null);
+
+    this.uniformVelocityXTextureLocation = gl.getUniformLocation(this.program, "u_velocityXTexture");
+    this.uniformVelocityYTextureLocation = gl.getUniformLocation(this.program, "u_velocityYTexture");
+
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toGridClipcoords"),
+        false, toGridClipcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toVelocityXTexcoords"),
+        false, toVelocityXTexcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toVelocityYTexcoords"),
+        false, toVelocityYTexcoords(this.nx, this.ny));
+  }
+
+  setupPositions(gl, program) {
+    const gridcoordsAttributeLocation = gl.getAttribLocation(program, "a_gridcoords");
+    const buffer = gl.createBuffer();
+    this.gridcoords = [];
+    for (let i = 0; i < this.nx - 1; i++) {
+      for (let j = 0; j < this.ny; j++) {
+        this.gridcoords.push(i, j, i + 1, j);
+      }
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.gridcoords), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(gridcoordsAttributeLocation);
+    gl.vertexAttribPointer(gridcoordsAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  render() {
+    this.gl.useProgram(this.program);
+    this.velocityX.renderFromB(this.uniformVelocityXTextureLocation);
+    this.velocityY.renderFromB(this.uniformVelocityYTextureLocation);
+    this.divergence.renderToA();
+    this.gl.bindVertexArray(this.vao);
+    this.gl.clearColor(0, 0, 0, 0);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.gridcoords.length / 2);
+    this.gl.bindVertexArray(null);
+  }
 }
 
 const vertexShaderSource = `#version 300 es
@@ -9,10 +83,11 @@ in vec2 a_gridcoords;
 
 out vec2 v_gridcoords;
 
-uniform mat4 toVelocityYClipcoords;
+uniform mat4 toGridClipcoords;
 
 void main() {
-  gl_Position = toVelocityYClipcoords * vec4(a_gridcoords, 0.0, 1.0);
+  v_gridcoords = a_gridcoords;
+  gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
 }
 `;
 
@@ -25,7 +100,7 @@ uniform sampler2D u_velocityXTexture;
 uniform sampler2D u_velocityYTexture;
 
 uniform mat4 toVelocityXTexcoords;
-uniform mat4 toVelociyYTexcoords;
+uniform mat4 toVelocityYTexcoords;
 
 out float divergence;
 
@@ -48,10 +123,10 @@ void main() {
   vec4 yc_up = yc + one_half_y;
   vec4 ytc_up = toVelocityYTexcoords * yc_up;
   
-  float R = texture(u_velocityXTexture, xc_right).x;
-  float L = texture(u_velocityXTexture, xc_left).x;
-  float U = texture(u_velocityYTexture, yc_up).x;
-  float D = texture(u_velocityYTexture, yc_down).x;
+  float R = texture(u_velocityXTexture, xtc_right.xy).x;
+  float L = texture(u_velocityXTexture, xtc_left.xy).x;
+  float U = texture(u_velocityYTexture, ytc_up.xy).x;
+  float D = texture(u_velocityYTexture, ytc_down.xy).x;
   
   divergence = ((R - L) + (U - D)) * 0.5;
 }

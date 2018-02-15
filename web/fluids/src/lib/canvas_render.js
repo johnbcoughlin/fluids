@@ -7,18 +7,27 @@ export class CanvasRender {
   ny;
   velocityX;
   velocityY;
+
+  waterMask;
+  airMask;
+  pressure;
   divergence;
 
   program;
   vao;
+  waterMaskLocation;
+  airMaskLocation;
   uniformTextureLocation;
 
-  constructor(gl, nx, ny, velocityX, velocityY, divergence) {
+  constructor(gl, nx, ny, velocityX, velocityY, waterMask, airMask, pressure, divergence) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
     this.velocityX = velocityX;
     this.velocityY = velocityY;
+    this.waterMask = waterMask;
+    this.airMask = airMask;
+    this.pressure = pressure;
     this.divergence = divergence;
     this.initialize(gl);
   }
@@ -36,6 +45,8 @@ export class CanvasRender {
     gl.bindVertexArray(null);
 
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "u_texture");
+    this.airMaskLocation = gl.getUniformLocation(this.program, "airMask");
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toGridClipcoords"),
@@ -69,7 +80,9 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.divergence.renderFromA(this.uniformTextureLocation);
+    this.pressure.renderFromA(this.uniformTextureLocation);
+    this.waterMask.renderFromA(this.waterMaskLocation);
+    this.airMask.renderFromA(this.airMaskLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -112,10 +125,24 @@ out vec4 outColor;
 
 uniform mat4 toGridTexcoords;
 uniform sampler2D u_texture;
+uniform mediump isampler2D waterMask;
+uniform mediump isampler2D airMask;
 
 void main() {
   vec4 texcoords = toGridTexcoords * v_gridcoords;
-  float velocityY = texture(u_texture, texcoords.xy).x;
-  outColor = vec4(velocityY, velocityY, 0.0, 1.0);
+  float pressure = texture(u_texture, texcoords.xy).x;
+  
+  int water = texture(waterMask, texcoords.xy).x;
+  int air = texture(airMask, texcoords.xy).x;
+  
+  if (water != 1 && air != 1) {
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+  } else if (air == 1) {
+    outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  } else if (pressure > 0.0) {
+    outColor = vec4(0.0, 0.0, pressure / 30.0, 1.0);
+  } else {
+    outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
+  }
 }
 `;

@@ -1,27 +1,34 @@
 import {createProgram, loadShader} from "../gl_util";
-import {toGridClipcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
+import {toGridClipcoords, toGridTexcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
 
 export class DivergenceRender {
   gl;
   nx;
+  dx;
   ny;
+  dy;
   divergence;
   velocityX;
   velocityY;
+  waterMask;
 
   program;
   vao;
   gridcoords;
   uniformVelocityXTextureLocation;
   uniformVelocityYTextureLocation;
+  waterMaskLocation;
 
-  constructor(gl, nx, ny, divergence, velocityX, velocityY) {
+  constructor(gl, nx, dx, ny, dy, divergence, velocityX, velocityY, waterMask) {
     this.gl = gl;
     this.nx = nx;
+    this.dx = dx;
     this.ny = ny;
+    this.dy = dy;
     this.divergence = divergence;
     this.velocityX = velocityX;
     this.velocityY = velocityY;
+    this.waterMask = waterMask;
     this.initialize(gl);
   }
 
@@ -38,6 +45,7 @@ export class DivergenceRender {
 
     this.uniformVelocityXTextureLocation = gl.getUniformLocation(this.program, "u_velocityXTexture");
     this.uniformVelocityYTextureLocation = gl.getUniformLocation(this.program, "u_velocityYTexture");
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toGridClipcoords"),
@@ -48,6 +56,11 @@ export class DivergenceRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toVelocityYTexcoords"),
         false, toVelocityYTexcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toGridTexcoords"),
+        false, toGridTexcoords(this.nx, this.ny));
+    gl.uniform1f(gl.getUniformLocation(this.program, "dx"), this.dx);
+    gl.uniform1f(gl.getUniformLocation(this.program, "dy"), this.dy);
   }
 
   setupPositions(gl, program) {
@@ -69,6 +82,7 @@ export class DivergenceRender {
     this.gl.useProgram(this.program);
     this.velocityX.renderFromB(this.uniformVelocityXTextureLocation);
     this.velocityY.renderFromB(this.uniformVelocityYTextureLocation);
+    this.waterMask.renderFromA(this.waterMaskLocation);
     this.divergence.renderToA();
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -98,9 +112,13 @@ in vec2 v_gridcoords;
 
 uniform sampler2D u_velocityXTexture;
 uniform sampler2D u_velocityYTexture;
+uniform mediump isampler2D waterMask;
 
 uniform mat4 toVelocityXTexcoords;
 uniform mat4 toVelocityYTexcoords;
+uniform mat4 toGridTexcoords;
+uniform float dx;
+uniform float dy;
 
 out float divergence;
 
@@ -128,6 +146,11 @@ void main() {
   float U = texture(u_velocityYTexture, ytc_up.xy).x;
   float D = texture(u_velocityYTexture, ytc_down.xy).x;
   
-  divergence = ((R - L) + (U - D)) * 0.5;
+  int water = texture(waterMask, (toGridTexcoords * vec4(v_gridcoords, 0.0, 1.0)).xy).x;
+  if (water == 1) {
+    divergence = ((R - L) + (U - D) / dy) * 0.5;
+  } else {
+    divergence = 0.0;
+  }
 }
 `;

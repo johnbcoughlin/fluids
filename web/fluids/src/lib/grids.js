@@ -32,3 +32,13 @@ export const toVelocityYTexcoords = (nx, ny) => {
   return toGridTexcoords(nx, ny + 1);
 };
 
+export const gridTriangleStripVertices = (nx, ny) => {
+  const positions = [];
+  for (let i = 0; i < nx-1; i++) {
+    for (let j = 0; j < ny; j++) {
+      // staggered grid
+      positions.push(i, j, i+1, j);
+    }
+  }
+  return positions;
+};

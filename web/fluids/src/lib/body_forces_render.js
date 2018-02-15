@@ -1,6 +1,6 @@
 
 import {createProgram, loadShader} from "../gl_util";
-import {toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
+import {toGridTexcoords, toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
 
 export class BodyForcesRender {
   gl;
@@ -16,6 +16,7 @@ export class BodyForcesRender {
   program;
   vao;
   positions;
+  waterMaskLocation;
   uniformTextureLocation;
 
   constructor(gl, nx, dx, ny, dy, dt, g, waterMask, velocityY) {
@@ -54,6 +55,9 @@ export class BodyForcesRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toVelocityYTexcoords"),
         false, toVelocityYTexcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toGridTexcoords"),
+        false, toGridTexcoords(this.nx, this.ny));
   }
 
   setupPositions(gl, program) {
@@ -123,12 +127,15 @@ uniform float dt;
 uniform float g;
 uniform sampler2D velocityYTexture;
 uniform lowp usampler2D waterMask;
+uniform mat4 toGridTexcoords;
  
 out float new_velocityY;
 
 void main() {
-  uint water_up = texture(waterMask, v_velocityYGridcoords).x;
-  uint water_down = texture(waterMask, v_velocityYGridcoords - vec2(1.0, 0.0)).x;
+  vec4 up = toGridTexcoords * vec4(v_velocityYGridcoords.xy, 0.0, 1.0);
+  vec4 down = toGridTexcoords * vec4(v_velocityYGridcoords.x, v_velocityYGridcoords.y - 1.0, 0.0, 1.0);
+  uint water_up = texture(waterMask, up.xy).x;
+  uint water_down = texture(waterMask, down.xy).x;
   if (water_up > uint(0) && water_down > uint(0)) {
     float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
     // new_velocityY = velocityY + g * dt;

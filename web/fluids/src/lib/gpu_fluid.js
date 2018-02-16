@@ -23,6 +23,7 @@ export class GPUFluid {
   velocityY;
   divergence;
   pressure;
+  multigrid;
 
   // render stages
   bodyForcesRender;
@@ -100,6 +101,13 @@ export class GPUFluid {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }, this.nx, this.ny);
 
+    this.multigrid = new TwoPhaseRenderTarget(gl, gl.TEXTURE7, 7, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    });
+
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.g, this.waterMask, this.velocityY);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.divergence,
@@ -113,9 +121,10 @@ export class GPUFluid {
   render() {
     this.bodyForcesRender.render();
     this.divergenceRender.render();
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 100; i++) {
       this.pressureJacobiRender.render();
     }
     this.canvasRender.render();
+    this.gl.finish();
   }
 }

@@ -1,7 +1,8 @@
 import {toGridClipcoords, toGridTexcoords, toGridTexcoordsWithOffset} from "./grids";
 import {createProgram, loadShader} from "../gl_util";
+import {MultigridRender} from "./multigrid_render";
 
-export class ErrorCorrectionJacobiRender {
+export class ErrorCorrectionJacobiRender extends MultigridRender {
   gl;
   nx;
   dx;
@@ -10,6 +11,7 @@ export class ErrorCorrectionJacobiRender {
   dt;
   waterMask;
   airMask;
+  pressure;
   multigrid;
 
   program;

@@ -29,6 +29,7 @@ export class GPUFluid {
   divergence;
   pressure;
   multigrid;
+  residualsMultigrid;
 
   // render stages
   bodyForcesRender;
@@ -124,6 +125,19 @@ export class GPUFluid {
         this.ny + Math.floor(Math.log2(this.ny)) * 2
     );
 
+    this.residualsMultigrid = new TwoPhaseRenderTarget(gl, gl.TEXTURE8, 8, () => {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
+              this.nx + Math.floor(Math.log2(this.nx)) * 2,
+              this.ny + Math.floor(Math.log2(this.ny)) * 2,
+              0, gl.RED, gl.FLOAT, null);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        },
+        this.nx + Math.floor(Math.log2(this.nx)) * 2,
+        this.ny + Math.floor(Math.log2(this.ny)) * 2
+    );
+
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.g, this.waterMask, this.velocityY);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.divergence,
@@ -131,7 +145,8 @@ export class GPUFluid {
     this.pressureJacobiRender = new SinglePressureJacobiRender(gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airMask, this.pressure, this.divergence);
     this.pressureResidualsRender = new PressureResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.waterMask, this.airMask, this.pressure, this.divergence);
+        this.dt, this.waterMask, this.airMask, this.pressure, this.divergence, this.multigrid,
+        this.residualsMultigrid);
 
     this.restrictPressureRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.multigrid,
         this.pressure);

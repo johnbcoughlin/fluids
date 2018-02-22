@@ -9,6 +9,8 @@ export class PressureResidualsRender {
   airMask;
   pressure;
   divergence;
+  multigrid;
+  residualsMultigrid;
 
   program;
   vao;
@@ -17,7 +19,7 @@ export class PressureResidualsRender {
   pressureLocation;
   divergenceLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, waterMask, airMask, pressure, divergence) {
+  constructor(gl, nx, dx, ny, dy, dt, waterMask, airMask, pressure, divergence, multigrid, residualsMultigrid) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -28,6 +30,8 @@ export class PressureResidualsRender {
     this.airMask = airMask;
     this.pressure = pressure;
     this.divergence = divergence;
+    this.multigrid = multigrid;
+    this.residualsMultigrid = residualsMultigrid;
     this.initialize(gl);
   }
 

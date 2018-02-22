@@ -3,6 +3,8 @@ import {CanvasRender} from "./canvas_render";
 import {BodyForcesRender} from "./body_forces_render";
 import {DivergenceRender} from "./divergence_render";
 import {SinglePressureJacobiRender} from "./pressure_correction_render";
+import {MultigridInterpolatePressure} from "./multigrid_interpolate";
+import {MultigridRestrictionRender} from "./multigrid_restrict";
 
 export class GPUFluid {
   // WebGL2 Context
@@ -29,6 +31,8 @@ export class GPUFluid {
   bodyForcesRender;
   divergenceRender;
   pressureJacobiRender;
+  restrictPressureRender;
+  interpolatePressureRender;
   canvasRender;
 
   constructor(gl) {
@@ -102,11 +106,15 @@ export class GPUFluid {
     }, this.nx, this.ny);
 
     this.multigrid = new TwoPhaseRenderTarget(gl, gl.TEXTURE7, 7, () => {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
+          this.nx, this.ny,
+          // this.nx + Math.floor(Math.log2(this.nx)) * 2,
+          // this.ny + Math.floor(Math.log2(this.ny)) * 2,
+          0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    });
+    }, this.nx, this.ny);
 
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.g, this.waterMask, this.velocityY);
@@ -114,8 +122,14 @@ export class GPUFluid {
         this.velocityX, this.velocityY, this.waterMask);
     this.pressureJacobiRender = new SinglePressureJacobiRender(gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airMask, this.pressure, this.divergence);
+
+    this.restrictPressureRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.multigrid,
+        this.pressure);
+    this.interpolatePressureRender = new MultigridInterpolatePressure(gl, this.nx, this.ny,
+        this.multigrid, this.pressure);
+
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
-        this.waterMask, this.airMask, this.pressure, this.divergence);
+        this.waterMask, this.airMask, this.pressure, this.divergence, this.multigrid);
   }
 
   render() {
@@ -124,7 +138,8 @@ export class GPUFluid {
     for (let i = 0; i < 100; i++) {
       this.pressureJacobiRender.render();
     }
-    this.canvasRender.render();
+    this.restrictPressureRender.restrictFrom(0);
+    this.canvasRender.render2();
     this.gl.finish();
   }
 }

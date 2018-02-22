@@ -12,6 +12,7 @@ export class CanvasRender {
   airMask;
   pressure;
   divergence;
+  multigrid;
 
   program;
   vao;
@@ -19,7 +20,7 @@ export class CanvasRender {
   airMaskLocation;
   uniformTextureLocation;
 
-  constructor(gl, nx, ny, velocityX, velocityY, waterMask, airMask, pressure, divergence) {
+  constructor(gl, nx, ny, velocityX, velocityY, waterMask, airMask, pressure, divergence, multigrid) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -29,6 +30,7 @@ export class CanvasRender {
     this.airMask = airMask;
     this.pressure = pressure;
     this.divergence = divergence;
+    this.multigrid = multigrid;
     this.initialize(gl);
   }
 
@@ -93,7 +95,7 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.velocityY.renderFromB(this.uniformTextureLocation);
+    this.multigrid.renderFromA(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -135,12 +137,19 @@ void main() {
   int water = texture(waterMask, texcoords.xy).x;
   int air = texture(airMask, texcoords.xy).x;
   
-  if (water != 1 && air != 1) {
-    outColor = vec4(0.0, 0.0, 0.0, 1.0);
-  } else if (air == 1) {
-    outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  } else if (pressure > 0.0) {
-    outColor = vec4(0.0, 0.0, pressure / 30.0, 1.0);
+  // if (water != 1 && air != 1) {
+  //   outColor = vec4(0.0, 0.0, 0.0, 1.0);
+  // } else if (air == 1) {
+  //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  // } else if (pressure > 0.0) {
+  //   outColor = vec4(0.0, 0.0, pressure / 30.0, 1.0);
+  // } else {
+  //   outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
+  // }
+  
+  
+  if (pressure > 0.0) {
+    outColor = vec4(0.0, 0.0, pressure, 1.0);
   } else {
     outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
   }

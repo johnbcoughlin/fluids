@@ -1,6 +1,6 @@
 import {createProgram, loadShader} from "../gl_util";
 
-class MultigridInterpolate {
+export class MultigridInterpolatePressure {
   gl;
   nx;
   ny;
@@ -13,10 +13,14 @@ class MultigridInterpolate {
 
   sourceLocation;
 
-  constructor(gl, multigrid, pressure) {
+  constructor(gl, nx, ny, multigrid, pressure) {
     this.gl = gl;
+    this.nx = nx;
+    this.ny = ny;
     this.multigrid = multigrid;
     this.pressure = pressure;
+
+    this.initialize(gl);
   }
 
   initialize(gl) {
@@ -26,54 +30,58 @@ class MultigridInterpolate {
 
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
 
-
+    this.setupPositions(gl, this.program);
   }
 
-  setupPositions(gl) {
-    let level = 0;
-    let levelNx = this.nx;
-    let levelNy = this.ny;
-    let xOffset = 0;
+  setupPositions(gl, program) {
+    let targetLevel = 0;
+    let targetLevelNx = this.nx;
+    let targetLevelNy = this.ny;
+    let offset = 0;
+    this.coords = [];
+    this.vaos = [];
 
-    while (levelNx > 2 && levelNy > 2) {
-      level = level + 1;
-      levelNx = Math.floor(this.nx / 2);
-      levelNy = Math.floor(this.ny / 2);
-
-
+    while (targetLevelNx > 2 && targetLevelNy > 2) {
       const levelCoords = [];
-      for (let i = 0; i < levelNx; i++) {
-        for (let j = 0; j < levelNy; j++) {
-          levelCoords.push(i + xOffset, j);
+      for (let i = 0; i < targetLevelNx; i++) {
+        for (let j = 0; j < targetLevelNy; j++) {
+          levelCoords.push(i + offset, j + offset);
+          if (targetLevel > 0) {
+            offset += Math.max(Math.floor(targetLevelNx / 2), Math.floor(targetLevelNy / 2)) + 1;
+          }
           if (i % 2 === 0 && j % 2 === 0) {
             levelCoords.push(
-                i / 2, j / 2, 1,
+                i / 2 + offset, j / 2, 1,
                 0, 0, 0,
                 0, 0, 0,
                 0, 0, 0);
           } else if (i % 2 === 0 && j % 2 === 1) {
             levelCoords.push(
-                i / 2, j / 2, 0.5,
-                i / 2, j / 2 + 1, 0.5,
+                i / 2 + offset, j / 2 + offset, 0.5,
+                i / 2 + offset, j / 2 + 1 + offset, 0.5,
                 0, 0, 0,
                 0, 0, 0);
           } else if (i % 2 === 1 && j % 2 === 0) {
             levelCoords.push(
-                i / 2, j / 2, 0.5,
+                i / 2 + offset, j / 2 + offset, 0.5,
                 0, 0, 0,
-                i / 2 + 1, j / 2, 0.5,
+                i / 2 + 1 + offset, j / 2 + offset, 0.5,
                 0, 0, 0);
           } else {
             levelCoords.push(
-                i / 2, j / 2, 0.25,
-                i / 2, j / 2 + 1, 0.25,
-                i / 2 + 1, j / 2, 0.25,
-                i / 2 + 1, j / 2 + 1, 0.25);
+                i / 2 + offset, j / 2 + offset, 0.25,
+                i / 2 + offset, j / 2 + 1 + offset, 0.25,
+                i / 2 + 1 + offset, j / 2 + offset, 0.25,
+                i / 2 + 1 + offset, j / 2 + 1 + offset, 0.25);
           }
         }
       }
-      this.coords[level] = levelCoords;
-      xOffset += levelNx;
+
+      this.coords[targetLevel] = levelCoords;
+
+      targetLevel = targetLevel + 1;
+      targetLevelNx = Math.floor(targetLevelNx / 2);
+      targetLevelNy = Math.floor(targetLevelNy / 2);
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -82,7 +90,7 @@ class MultigridInterpolate {
       const vao = gl.createVertexArray();
 
       gl.bindVertexArray(vao);
-      const afterGridCoordLocation = gl.getAttribLocation(program, "afterGridCoords");
+      const afterGridCoordLocation = gl.getAttribLocation(program, "afterGridcoords");
       gl.enableVertexAttribArray(afterGridCoordLocation);
       gl.vertexAttribPointer(
           afterGridCoordLocation, 2, gl.FLOAT, false, 14 * Float32Array.BYTES_PER_ELEMENT, 0);
@@ -106,10 +114,9 @@ class MultigridInterpolate {
       gl.vertexAttribPointer(
           contributor4Location, 3, gl.FLOAT, false, 14 * Float32Array.BYTES_PER_ELEMENT,
           11 * Float32Array.BYTES_PER_ELEMENT);
-      )
 
       gl.bindVertexArray(null);
-      this.vaos[level] = vao;
+      this.vaos[targetLevel] = vao;
     }
   }
 
@@ -126,14 +133,14 @@ class MultigridInterpolate {
       this.multigrid.renderToB();
     }
 
-    gl.drawArrays(gl.POINTS, )
+    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level - 1].length / 14);
 
     this.gl.bindVertexArray(null);
   }
 }
 
 const vertexShaderSource = `#version 300 es
-in ivec4 afterGridcoords;
+in vec4 afterGridcoords;
 
 in vec4 contributor1;
 in vec4 contributor2;
@@ -153,22 +160,24 @@ out float value;
 
 void main() {
   gl_Position = afterGridcoordsToClipcoords * afterGridcoords;
+  gl_PointSize = 1.0;
   
   value = 
-      texture(source, (beforeGridToTexcoords * contributor1).xy) * contributor1.z +
-      texture(source, (beforeGridToTexcoords * contributor2).xy) * contributor2.z +
-      texture(source, (beforeGridToTexcoords * contributor3).xy) * contributor3.z +
-      texture(source, (beforeGridToTexcoords * contributor4).xy) * contributor4.z;
+      texture(source, (beforeGridToTexcoords * contributor1).xy).x * contributor1.z +
+      texture(source, (beforeGridToTexcoords * contributor2).xy).x * contributor2.z +
+      texture(source, (beforeGridToTexcoords * contributor3).xy).x * contributor3.z +
+      texture(source, (beforeGridToTexcoords * contributor4).xy).x * contributor4.z;
 }
 `;
 
 const fragmentShaderSource = `#version 300 es
+precision mediump float;
+
 in float value;
 
 out float Value;
 
 void main() {
   Value = value;
-  gl_PointSize = 1.0;
 }
 `;

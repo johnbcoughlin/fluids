@@ -1,5 +1,8 @@
+// @flow
+
 import {createProgram, loadShader, renderToCanvas} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
+import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class CanvasRender {
   gl;
@@ -11,8 +14,9 @@ export class CanvasRender {
   waterMask;
   airMask;
   pressure;
-  divergence;
+  residuals;
   multigrid;
+  residualsMultigrid;
 
   program;
   vao;
@@ -20,7 +24,17 @@ export class CanvasRender {
   airMaskLocation;
   uniformTextureLocation;
 
-  constructor(gl, nx, ny, velocityX, velocityY, waterMask, airMask, pressure, divergence, multigrid) {
+  constructor(gl: any,
+              nx: num,
+              ny: num,
+              velocityX: TwoPhaseRenderTarget,
+              velocityY: TwoPhaseRenderTarget,
+              waterMask: TwoPhaseRenderTarget,
+              airMask: TwoPhaseRenderTarget,
+              pressure: TwoPhaseRenderTarget,
+              residuals: TwoPhaseRenderTarget,
+              multigrid: TwoPhaseRenderTarget,
+              residualsMultigrid: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -29,8 +43,9 @@ export class CanvasRender {
     this.waterMask = waterMask;
     this.airMask = airMask;
     this.pressure = pressure;
-    this.divergence = divergence;
+    this.residuals = residuals;
     this.multigrid = multigrid;
+    this.residualsMultigrid = residualsMultigrid;
     this.initialize(gl);
   }
 
@@ -82,7 +97,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.pressure.renderFromA(this.uniformTextureLocation);
+    this.pressure.renderFromB(this.uniformTextureLocation);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
     renderToCanvas(this.gl);
@@ -95,7 +110,7 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.pressure.renderFromB(this.uniformTextureLocation);
+    this.multigrid.renderFromA(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -141,17 +156,10 @@ void main() {
   //   outColor = vec4(0.0, 0.0, 0.0, 1.0);
   // } else if (air == 1) {
   //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  // } else if (pressure > 0.0) {
-  //   outColor = vec4(0.0, 0.0, pressure / 30.0, 1.0);
-  // } else {
-  //   outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
-  // }
-  
-  
   if (pressure > 0.0) {
-    outColor = vec4(0.0, 0.0, pressure / 3.0, 1.0);
+    outColor = vec4(0.0, 0.0, pressure * 10.0, 1.0);
   } else {
-    outColor = vec4(abs(pressure) / 3.0, 0.0, 0.0, 1.0);
+    outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
   }
 }
 `;

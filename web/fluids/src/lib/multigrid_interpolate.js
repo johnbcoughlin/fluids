@@ -1,3 +1,5 @@
+// @flow
+
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 
@@ -85,7 +87,6 @@ export class MultigridInterpolatePressure {
       }
 
       this.coords[targetLevel] = levelCoords;
-      console.log(levelCoords);
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

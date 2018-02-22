@@ -1,3 +1,4 @@
+// @flow
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 
@@ -5,8 +6,8 @@ export class MultigridRestrictionRender {
   gl;
   nx;
   ny;
-  multigrid;
-  pressure;
+  residuals;
+  residualsMultigrid;
 
   program;
   vaos;
@@ -14,12 +15,12 @@ export class MultigridRestrictionRender {
 
   sourceLocation;
 
-  constructor(gl, nx, ny, multigrid, pressure) {
+  constructor(gl, nx, ny, residuals, residualsMultigrid) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
-    this.multigrid = multigrid;
-    this.pressure = pressure;
+    this.residuals = residuals;
+    this.residualsMultigrid = residualsMultigrid;
 
     this.initialize(gl);
   }
@@ -38,7 +39,7 @@ export class MultigridRestrictionRender {
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-        false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
+        false, toGridClipcoords(this.residualsMultigrid.width, this.residualsMultigrid.height));
   }
 
   setupPositions(gl, program) {
@@ -140,11 +141,11 @@ export class MultigridRestrictionRender {
     this.gl.useProgram(this.program);
 
     if (level === 0) {
-      this.pressure.renderFromB(this.sourceLocation);
-      this.multigrid.renderToA();
+      this.residuals.renderFromB(this.sourceLocation);
+      this.residualsMultigrid.renderToA();
     } else {
-      this.multigrid.renderFromA(this.sourceLocation);
-      this.multigrid.renderToB();
+      this.residualsMultigrid.renderFromB(this.sourceLocation);
+      this.residualsMultigrid.renderToA();
     }
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);

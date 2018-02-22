@@ -1,6 +1,8 @@
+// @flow
 
 import {createProgram, loadShader} from "../gl_util";
 import {toGridTexcoords, toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
+import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class BodyForcesRender {
   gl;
@@ -19,7 +21,15 @@ export class BodyForcesRender {
   waterMaskLocation;
   uniformTextureLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, g, waterMask, velocityY) {
+  constructor(gl: any,
+              nx: num,
+              dx: num,
+              ny: num,
+              dy: num,
+              dt: num,
+              g: num,
+              waterMask: TwoPhaseRenderTarget,
+              velocityY: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;

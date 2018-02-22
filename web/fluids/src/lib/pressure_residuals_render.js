@@ -1,94 +1,86 @@
-import {createProgram, loadShader} from "../gl_util";
-import {gridPointVertices, toGridClipcoords, toGridTexcoords} from "./grids";
+// @flow
+import {toGridClipcoords, toGridTexcoords} from "./grids";
+import {MultigridRender} from "./multigrid_render";
+import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
-export class PressureResidualsRender {
-  gl;
-  nx;
-  ny;
+export class ResidualsRender extends MultigridRender {
   waterMask;
   airMask;
-  pressure;
-  divergence;
-  multigrid;
-  residualsMultigrid;
 
-  program;
-  vao;
   waterMaskLocation;
   airMaskLocation;
-  pressureLocation;
-  divergenceLocation;
+  solutionLocation;
+  residualsLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, waterMask, airMask, pressure, divergence, multigrid, residualsMultigrid) {
-    this.gl = gl;
-    this.nx = nx;
+  constructor(gl: any,
+              nx: num,
+              dx: num,
+              ny: num,
+              dy: num,
+              dt: num,
+              waterMask: TwoPhaseRenderTarget,
+              airMask: TwoPhaseRenderTarget,
+              pressure: TwoPhaseRenderTarget,
+              residuals: TwoPhaseRenderTarget,
+              multigrid: TwoPhaseRenderTarget,
+              residualsMultigrid: TwoPhaseRenderTarget) {
+    super(gl, nx, ny, pressure, residuals, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
-    this.ny = ny;
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
     this.airMask = airMask;
-    this.pressure = pressure;
-    this.divergence = divergence;
-    this.multigrid = multigrid;
-    this.residualsMultigrid = residualsMultigrid;
     this.initialize(gl);
   }
 
-  initialize(gl) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-    this.program = createProgram(gl, vertexShader, fragmentShader);
+  initializeLevel(level, levelNx, levelNy, offset) {
+    // no-op
+  }
 
-    gl.useProgram(this.program);
-    this.vao = gl.createVertexArray();
-    gl.bindVertexArray(this.vao);
-    this.setupPositions(gl, this.program);
-    gl.bindVertexArray(null);
+  initializeUniforms(gl, program) {
+    this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
+    this.airMaskLocation = gl.getUniformLocation(program, "airMask");
+    this.residualsLocation = gl.getUniformLocation(program, "residuals");
+    this.solutionLocation = gl.getUniformLocation(program, "solution");
 
-    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
-    this.airMaskLocation = gl.getUniformLocation(this.program, "airMask");
-    this.divergenceLocation = gl.getUniformLocation(this.program, "u_divergence");
-    this.pressureLocation = gl.getUniformLocation(this.program, "pressure");
-
-    gl.uniform1f(gl.getUniformLocation(this.program, "dx"), this.dx);
-    gl.uniform1f(gl.getUniformLocation(this.program, "dy"), this.dy);
-    gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
+    gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
+    gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
+    gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
     gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toGridClipcoords"),
+        gl.getUniformLocation(program, "toGridClipcoords"),
         false, toGridClipcoords(this.nx, this.ny));
     gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toGridTexcoords"),
+        gl.getUniformLocation(program, "toGridTexcoords"),
         false, toGridTexcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl, program) {
+  bindCoordinateArrays(gl, program) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
-    const buffer = gl.createBuffer();
-    this.gridcoords = gridPointVertices(this.nx, this.ny);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.gridcoords), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(gridcoordsLocation);
     gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render() {
+  render(level) {
     this.gl.useProgram(this.program);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
-    this.divergence.renderFromA(this.divergenceLocation);
-    this.pressure.renderFromA(this.pressureLocation);
-    this.pressure.renderToB();
-    this.gl.bindVertexArray(this.vao);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.gridcoords.length / 2);
+    if (level === 0) {
+      this.residuals.renderFromA(this.residualsLocation);
+      this.pressure.renderFromA(this.solutionLocation);
+      this.residuals.renderToB();
+    } else {
+      this.residualsMultigrid.renderFromA(this.residualsLocation);
+      this.multigrid.renderFromA(this.solutionLocation);
+      this.residualsMultigrid.renderToB();
+    }
+    this.gl.bindVertexArray(this.vaos[0]);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[0].length);
     this.gl.bindVertexArray(null);
   }
 }
 
 const vertexShaderSource = `#version 300 es
 in vec2 a_gridcoords;
-
-out vec2 v_gridcoords;
 
 uniform mat4 toGridClipcoords;
 uniform mat4 toGridTexcoords;
@@ -98,27 +90,26 @@ uniform float dy;
 uniform float dt;
 uniform mediump isampler2D waterMask;
 uniform mediump isampler2D airMask;
-uniform sampler2D pressure;
-uniform mediump sampler2D u_divergence;
+uniform sampler2D residuals;
+uniform mediump sampler2D solution;
 
-out float r;
+out float new_residual;
 
 void main() {
-  v_gridcoords = a_gridcoords;
   gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
   gl_PointSize = 1.0;
   
-  vec2 here = (toGridTexcoords * vec4(v_gridcoords, 0.0, 1.0)).xy;
+  vec2 here = (toGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
   int water_here = texture(waterMask, here).x;
   if (water_here == 0) {
-    r = 0.0;
+    new_residual = 0.0;
     return;
   }
   
-  vec2 left = (toGridTexcoords * vec4((v_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 right = (toGridTexcoords * vec4((v_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 up = (toGridTexcoords * vec4((v_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
-  vec2 down = (toGridTexcoords * vec4((v_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
+  vec2 left = (toGridTexcoords * vec4((a_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
+  vec2 right = (toGridTexcoords * vec4((a_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
+  vec2 up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
+  vec2 down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
   
   int water_left = texture(waterMask, left).x;
   int water_right = texture(waterMask, right).x;
@@ -129,35 +120,37 @@ void main() {
   int air_up = texture(airMask, up).x;
   int air_down = texture(airMask, down).x;
   
-  float pressure_left = texture(pressure, left).x;
-  float pressure_right = texture(pressure, right).x;
-  float pressure_up = texture(pressure, up).x;
-  float pressure_down = texture(pressure, down).x;
+  float solution_left = texture(solution, left).x;
+  float solution_right = texture(solution, right).x;
+  float solution_up = texture(solution, up).x;
+  float solution_down = texture(solution, down).x;
   
-  float pressure_here = texture(pressure, here).x;
-  float divergence = texture(u_divergence, here).x;
+  float solution_here = texture(solution, here).x;
+  float residual_here = texture(residuals, here).x;
   
+  float norm = dt / (dx * dx);
   int neighbors = water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down;
   
-  float Lp = (dt / (dx * dx)) * (float(neighbors) * pressure_here - (
-      float(water_left) * pressure_left + 
-      float(water_right) * pressure_right +
-      float(water_up) * pressure_up + 
-      float(water_down) * pressure_down));
+  float Lp = 
+      float(neighbors) * norm * solution_here -
+      (float(water_left) * solution_left + 
+      float(water_right) * solution_right +
+      float(water_up) * solution_up + 
+      float(water_down) * solution_down) * norm;
       
-  r = Lp - divergence;
+  new_residual = residual_here - Lp;
 }
 `;
 
 const fragmentShaderSource = `#version 300 es
 precision mediump float;
 
-in float r;
+in float new_residual;
 
-out float R;
+out float value;
 
 void main() {
-  R = r;
+  value = new_residual;
 }
 `;

@@ -1,5 +1,7 @@
+// @flow
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
+import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class DivergenceRender {
   gl;
@@ -19,7 +21,15 @@ export class DivergenceRender {
   uniformVelocityYTextureLocation;
   waterMaskLocation;
 
-  constructor(gl, nx, dx, ny, dy, divergence, velocityX, velocityY, waterMask) {
+  constructor(gl: any,
+              nx: num,
+              dx: num,
+              ny: num,
+              dy: num,
+              divergence: TwoPhaseRenderTarget,
+              velocityX: TwoPhaseRenderTarget,
+              velocityY: TwoPhaseRenderTarget,
+              waterMask: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;

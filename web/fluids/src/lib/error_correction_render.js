@@ -1,137 +1,114 @@
+// @flow
 import {toGridClipcoords, toGridTexcoords, toGridTexcoordsWithOffset} from "./grids";
-import {createProgram, loadShader} from "../gl_util";
 import {MultigridRender} from "./multigrid_render";
+import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class ErrorCorrectionJacobiRender extends MultigridRender {
-  gl;
-  nx;
   dx;
-  ny;
   dy;
   dt;
   waterMask;
   airMask;
-  pressure;
-  multigrid;
 
-  program;
-  vaos;
   toFinestGridTexcoords;
   waterMaskLocation;
   airMaskLocation;
-  pressureLocation;
+  solutionLocation;
+  residualsLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, waterMask, airMask, multigrid) {
-    this.gl = gl;
-    this.nx = nx;
+  constructor(gl: any,
+              nx: num,
+              dx: num,
+              ny: num,
+              dy: num,
+              dt: num,
+              waterMask: TwoPhaseRenderTarget,
+              airMask: TwoPhaseRenderTarget,
+              pressure: TwoPhaseRenderTarget,
+              residuals: TwoPhaseRenderTarget,
+              multigrid: TwoPhaseRenderTarget,
+              residualsMultigrid: TwoPhaseRenderTarget) {
+    super(gl, nx, ny, pressure, residuals, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
+    this.toFinestGridTexcoords = [toGridTexcoords(nx, ny)];
     this.dx = dx;
-    this.ny = ny;
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
     this.airMask = airMask;
-    this.multigrid = multigrid;
     this.initialize(gl);
   }
 
-  initialize(gl) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-    this.program = createProgram(gl, vertexShader, fragmentShader);
+  initializeUniforms(gl, program) {
+    this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
+    this.airMaskLocation = gl.getUniformLocation(program, "airMask");
+    this.solutionLocation = gl.getUniformLocation(program, "solution");
+    this.residualsLocation = gl.getUniformLocation(program, "residuals");
 
-    gl.useProgram(this.program);
-    this.setupPositions(gl, this.program);
-
-    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
-    this.airMaskLocation = gl.getUniformLocation(this.program, "airMask");
-    this.pressureLocation = gl.getUniformLocation(this.program, "pressure");
-
-    gl.uniform1f(gl.getUniformLocation(this.program, "dx"), this.dx);
-    gl.uniform1f(gl.getUniformLocation(this.program, "dy"), this.dy);
-    gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toGridClipcoords"),
-        false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toGridTexcoords"),
-        false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
+    gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
+    gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
+    gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
 
-  setupPositions(gl, program) {
-    let level = 1;
-    let levelNx = Math.floor(this.nx / 2);
-    let levelNy = Math.floor(this.ny / 2);
-    let offset = 0;
-    this.coords = [];
-    this.vaos = [];
-    this.toFinestGridTexcoords = [];
+  initializeLevel(level, levelNx, levelNy, offset) {
+    this.toFinestGridTexcoords[level] = toGridTexcoordsWithOffset(levelNx, levelNy, offset);
+  }
 
-    while (levelNx > 2 && levelNy > 2) {
-      const levelCoords = [];
-      for (let i = 0; i < levelNx; i++) {
-        for (let j = 0; j < levelNy; j++) {
-          levelCoords.push(i + offset, j + offset);
-        }
-      }
-      this.coords[level] = levelCoords;
-
-      const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(levelCoords), gl.STATIC_DRAW);
-
-      const vao = gl.createVertexArray();
-      this.vaos[level] = vao;
-      gl.bindVertexArray(vao);
-      gl.enableVertexAttribArray(gridcoordsLocation);
-      gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
-      gl.bindVertexArray(null);
-
-      this.toFinestGridTexcoords[level] = toGridTexcoordsWithOffset(
-          levelNx, levelNy, offset);
-
-      offset += Math.max(levelNx, levelNy);
-      levelNx = Math.floor(levelNx / 2);
-      levelNy = Math.floor(levelNy / 2);
-      level += 1;
-    }
+  bindCoordinateArrays(gl, program) {
+    const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
+    gl.enableVertexAttribArray(gridcoordsLocation);
+    gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
   render(level) {
+    const gl = this.gl;
+    const program = this.program;
+    gl.useProgram(program);
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(program, "toFinestGridTexcoords"),
+        false, this.toFinestGridTexcoords[level]);
+
     if (level === 0) {
-      throw new Error("level must be at least 1");
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridClipcoords"),
+          false, toGridClipcoords(this.nx, this.ny));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridTexcoords"),
+          false, toGridTexcoords(this.nx, this.ny));
+      this.renderAToB(level, this.pressure, this.residuals);
+      this.renderBToA(level, this.pressure, this.residuals);
+
+    } else {
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridClipcoords"),
+          false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridTexcoords"),
+          false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
+      this.renderAToB(level, this.multigrid, this.residualsMultigrid);
+      this.renderBToA(level, this.multigrid, this.residualsMultigrid);
+
     }
-    this.renderAToB(level);
-    this.renderBToA(level);
   }
 
-  renderAToB(level) {
-    this.gl.useProgram(this.program);
+  renderAToB(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
-    this.multigrid.renderFromA(this.pressureLocation);
-    this.multigrid.renderToB();
-    console.log(this.toFinestGridTexcoords[level]);
-    console.log(level);
-    this.gl.uniformMatrix4fv(
-        this.gl.getUniformLocation(this.program, "toFinestGridTexcoords"),
-        false, this.toFinestGridTexcoords[level]);
+    residuals.renderFromA(this.residualsLocation);
+    solution.renderFromA(this.solutionLocation);
+    solution.renderToB();
     this.gl.bindVertexArray(this.vaos[level]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length / 2);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
   }
 
-  renderBToA(level) {
-    this.gl.useProgram(this.program);
+  renderBToA(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
-    this.multigrid.renderFromB(this.pressureLocation);
-    this.multigrid.renderToA();
-    this.gl.uniformMatrix4fv(
-        this.gl.getUniformLocation(this.program, "toFinestGridTexcoords"),
-        false, this.toFinestGridTexcoords[level]);
+    residuals.renderFromA(this.residualsLocation);
+    solution.renderFromB(this.solutionLocation);
+    solution.renderToA();
     this.gl.bindVertexArray(this.vaos[level]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length / 2);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
   }
 }
@@ -145,21 +122,23 @@ uniform float dy;
 uniform float dt;
 uniform mediump isampler2D waterMask;
 uniform mediump isampler2D airMask;
-uniform sampler2D pressure;
+uniform sampler2D solution;
+uniform sampler2D residuals;
 
 uniform mat4 toGridTexcoords;
 uniform mat4 toFinestGridTexcoords;
 
-out float value;
+out float new_solution;
 
 void main() {
   gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
+  gl_PointSize = 1.0;
   
   // First refer to the finest grid discretization for mask values
   vec2 here = (toFinestGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
   int water_here = texture(waterMask, here).x;
   if (water_here == 0) {
-    value = 0.0;
+    new_solution = 0.0;
     return;
   }
   
@@ -184,32 +163,34 @@ void main() {
   up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
   down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
   
-  float pressure_left = texture(pressure, left).x;
-  float pressure_right = texture(pressure, right).x;
-  float pressure_up = texture(pressure, up).x;
-  float pressure_down = texture(pressure, down).x;
-  float pressure_here = texture(pressure, here).x;
   
-  // TODO handle air cells here
-  int d = water_left + water_right + water_up + water_down + 
-  air_left + air_right + air_up + air_down;
+  float solution_left = texture(solution, left).x;
+  float solution_right = texture(solution, right).x;
+  float solution_up = texture(solution, up).x;
+  float solution_down = texture(solution, down).x;
   
-  value = (1.0 / float(d)) * (
-      float(water_left) * pressure_left + 
-      float(water_right) * pressure_right +
-      float(water_up) * pressure_up + 
-      float(water_down) * pressure_down);
+  float residual_here = texture(residuals, here).x;
+  
+  float norm = dt / (dx * dx);
+  float d = float(water_left + water_right + water_up + water_down + 
+  air_left + air_right + air_up + air_down) * norm;
+  
+  new_solution = (1.0 / d) * (residual_here +
+      (float(water_left) * solution_left + 
+      float(water_right) * solution_right +
+      float(water_up) * solution_up + 
+      float(water_down) * solution_down) * norm);
 }
 `;
 
 const fragmentShaderSource = `#version 300 es
 precision mediump float;
 
-in float value;
+in float new_solution;
 
-out float Value;
+out float value;
 
 void main() {
-  Value = value;
+  value = new_solution;
 }
 `;

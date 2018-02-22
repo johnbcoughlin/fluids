@@ -1,3 +1,4 @@
+// @flow
 export const toGridClipcoords = (nx, ny) => {
   return [
     2 / nx, 0, 0, 0,
@@ -57,7 +58,7 @@ export const gridPointVertices = (nx, ny) => {
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
       // staggered grid
-      positions.push(i, j);
+      positions.push([i, j]);
     }
   }
   return positions;

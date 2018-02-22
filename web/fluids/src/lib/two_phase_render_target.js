@@ -1,6 +1,9 @@
+// @flow
+
 export class TwoPhaseRenderTarget {
   // the WebGL2 Context
   gl;
+  name: string;
   textureUnit;
   textureUnitInt;
   textureFactory;
@@ -12,8 +15,9 @@ export class TwoPhaseRenderTarget {
   framebufferB = null;
   textureB = null;
 
-  constructor(gl, textureUnit, textureUnitInt, textureFactory, width, height) {
+  constructor(gl, name: string, textureUnit, textureUnitInt, textureFactory, width, height) {
     this.gl = gl;
+    this.name = name;
     this.textureUnit = textureUnit;
     this.textureUnitInt = textureUnitInt;
     this.textureFactory = textureFactory;

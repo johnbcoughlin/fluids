@@ -16,6 +16,15 @@ export const toGridTexcoords = (nx, ny) => {
   ];
 };
 
+export const toGridTexcoordsWithOffset = (nx, ny, offset) => {
+  return [
+    1 / nx, 0, 0, 0,
+    0, 1 / ny, 0, 0,
+    0, 0, 1, 0,
+    (0.5 - offset) / nx, (0.5 - offset) / ny, 0, 1
+  ]
+};
+
 export const toVelocityXClipcoords = (nx, ny) => {
   return toGridClipcoords(nx + 1, ny);
 };
@@ -34,10 +43,21 @@ export const toVelocityYTexcoords = (nx, ny) => {
 
 export const gridTriangleStripVertices = (nx, ny) => {
   const positions = [];
-  for (let i = 0; i < nx-1; i++) {
+  for (let i = 0; i < nx - 1; i++) {
     for (let j = 0; j < ny; j++) {
       // staggered grid
-      positions.push(i, j, i+1, j);
+      positions.push(i, j, i + 1, j);
+    }
+  }
+  return positions;
+};
+
+export const gridPointVertices = (nx, ny) => {
+  const positions = [];
+  for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) {
+      // staggered grid
+      positions.push(i, j);
     }
   }
   return positions;

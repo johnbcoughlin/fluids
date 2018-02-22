@@ -95,7 +95,7 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.multigrid.renderFromA(this.uniformTextureLocation);
+    this.pressure.renderFromB(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -149,9 +149,9 @@ void main() {
   
   
   if (pressure > 0.0) {
-    outColor = vec4(0.0, 0.0, pressure, 1.0);
+    outColor = vec4(0.0, 0.0, pressure / 3.0, 1.0);
   } else {
-    outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
+    outColor = vec4(abs(pressure) / 3.0, 0.0, 0.0, 1.0);
   }
 }
 `;

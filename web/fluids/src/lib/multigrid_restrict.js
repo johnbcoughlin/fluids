@@ -38,7 +38,7 @@ export class MultigridRestrictionRender {
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-        false, toGridClipcoords(this.nx, this.ny));
+        false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
   }
 
   setupPositions(gl, program) {
@@ -59,7 +59,6 @@ export class MultigridRestrictionRender {
           levelCoords.push([
             // the coordinates of the target of the restriction
             i + offset, j + offset,
-              // 0.5, 0.5,
             // the coordinates of the source grid points which contribute to the target
             2 * i - 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
             2 * i - 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
@@ -141,13 +140,12 @@ export class MultigridRestrictionRender {
     this.gl.useProgram(this.program);
 
     if (level === 0) {
-      this.pressure.renderFromA(this.sourceLocation);
+      this.pressure.renderFromB(this.sourceLocation);
+      this.multigrid.renderToA();
     } else {
-      this.multigrid.renderFromB(this.sourceLocation);
+      this.multigrid.renderFromA(this.sourceLocation);
+      this.multigrid.renderToB();
     }
-    this.multigrid.renderToA();
-    this.gl.clearColor(0.4, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);

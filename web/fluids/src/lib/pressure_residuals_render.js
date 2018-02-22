@@ -1,13 +1,10 @@
 import {createProgram, loadShader} from "../gl_util";
-import {gridTriangleStripVertices, toGridClipcoords, toGridTexcoords} from "./grids";
+import {gridPointVertices, toGridClipcoords, toGridTexcoords} from "./grids";
 
-export class SinglePressureJacobiRender {
+export class PressureResidualsRender {
   gl;
   nx;
-  dx;
   ny;
-  dy;
-  dt;
   waterMask;
   airMask;
   pressure;
@@ -15,7 +12,6 @@ export class SinglePressureJacobiRender {
 
   program;
   vao;
-  gridcoords;
   waterMaskLocation;
   airMaskLocation;
   pressureLocation;
@@ -65,7 +61,7 @@ export class SinglePressureJacobiRender {
   setupPositions(gl, program) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     const buffer = gl.createBuffer();
-    this.gridcoords = gridTriangleStripVertices(this.nx, this.ny);
+    this.gridcoords = gridPointVertices(this.nx, this.ny);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.gridcoords), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(gridcoordsLocation);
@@ -73,11 +69,6 @@ export class SinglePressureJacobiRender {
   }
 
   render() {
-    this.renderAToB();
-    this.renderBToA();
-  }
-
-  renderAToB() {
     this.gl.useProgram(this.program);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
@@ -85,19 +76,7 @@ export class SinglePressureJacobiRender {
     this.pressure.renderFromA(this.pressureLocation);
     this.pressure.renderToB();
     this.gl.bindVertexArray(this.vao);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.gridcoords.length / 2);
-    this.gl.bindVertexArray(null);
-  }
-
-  renderBToA() {
-    this.gl.useProgram(this.program);
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airMask.renderFromA(this.airMaskLocation);
-    this.divergence.renderFromA(this.divergenceLocation);
-    this.pressure.renderFromB(this.pressureLocation);
-    this.pressure.renderToA();
-    this.gl.bindVertexArray(this.vao);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.gridcoords.length / 2);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.gridcoords.length / 2);
     this.gl.bindVertexArray(null);
   }
 }
@@ -105,7 +84,11 @@ export class SinglePressureJacobiRender {
 const vertexShaderSource = `#version 300 es
 in vec2 a_gridcoords;
 
+out vec2 v_gridcoords;
+
 uniform mat4 toGridClipcoords;
+uniform mat4 toGridTexcoords;
+
 uniform float dx;
 uniform float dy;
 uniform float dt;
@@ -114,24 +97,24 @@ uniform mediump isampler2D airMask;
 uniform sampler2D pressure;
 uniform mediump sampler2D u_divergence;
 
-uniform mat4 toGridTexcoords;
-
-out float value;
+out float r;
 
 void main() {
+  v_gridcoords = a_gridcoords;
   gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
+  gl_PointSize = 1.0;
   
-  vec2 here = (toGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
+  vec2 here = (toGridTexcoords * vec4(v_gridcoords, 0.0, 1.0)).xy;
   int water_here = texture(waterMask, here).x;
   if (water_here == 0) {
-    value = 0.0;
+    r = 0.0;
     return;
   }
   
-  vec2 left = (toGridTexcoords * vec4((a_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 right = (toGridTexcoords * vec4((a_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
-  vec2 down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
+  vec2 left = (toGridTexcoords * vec4((v_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
+  vec2 right = (toGridTexcoords * vec4((v_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
+  vec2 up = (toGridTexcoords * vec4((v_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
+  vec2 down = (toGridTexcoords * vec4((v_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
   
   int water_left = texture(waterMask, left).x;
   int water_right = texture(waterMask, right).x;
@@ -149,28 +132,28 @@ void main() {
   
   float pressure_here = texture(pressure, here).x;
   float divergence = texture(u_divergence, here).x;
-  float b = divergence * dx * dx / dt;
   
-  // TODO handle air cells here
-  int d = water_left + water_right + water_up + water_down + 
+  int neighbors = water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down;
   
-  value = (1.0 / float(d)) * (b + 
+  float Lp = (dt / (dx * dx)) * (float(neighbors) * pressure_here - (
       float(water_left) * pressure_left + 
       float(water_right) * pressure_right +
       float(water_up) * pressure_up + 
-      float(water_down) * pressure_down);
+      float(water_down) * pressure_down));
+      
+  r = Lp - divergence;
 }
 `;
 
 const fragmentShaderSource = `#version 300 es
 precision mediump float;
 
-in float value;
+in float r;
 
-out float Value;
+out float R;
 
 void main() {
-  Value = value;
+  R = r;
 }
 `;

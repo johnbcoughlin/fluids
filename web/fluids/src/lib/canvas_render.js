@@ -97,7 +97,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.pressure.renderFromB(this.uniformTextureLocation);
+    this.pressure.renderFromA(this.uniformTextureLocation);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
     renderToCanvas(this.gl);

@@ -149,12 +149,13 @@ export class GPUFluid {
     this.restrictResidualsRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.residuals,
         this.residualsMultigrid);
     this.interpolatePressureRender = new MultigridInterpolatePressure(gl, this.nx, this.ny,
-        this.multigrid, this.pressure);
+        this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
 
-    this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny, this.pressure, this.multigrid);
+    this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny, this.pressure, this.residuals,
+        this.multigrid, this.residualsMultigrid);
 
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);

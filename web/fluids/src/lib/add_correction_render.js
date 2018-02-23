@@ -31,8 +31,8 @@ export class AddCorrectionRender extends MultigridRender {
     gl.useProgram(this.program);
     if (level === 0) {
       this.pressure.renderFromA(this.solutionLocation);
-      this.pressure.renderFromB(this.correctionLocation);
-      this.pressure.renderToA();
+      this.residuals.renderFromB(this.correctionLocation);
+      this.pressure.renderToB();
       gl.uniformMatrix4fv(
           gl.getUniformLocation(this.program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
@@ -40,6 +40,7 @@ export class AddCorrectionRender extends MultigridRender {
           gl.getUniformLocation(this.program, "toGridTexcoords"),
           false, toGridTexcoords(this.nx, this.ny));
     } else {
+      throw new Error();
       gl.uniformMatrix4fv(
           gl.getUniformLocation(this.program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
@@ -50,6 +51,7 @@ export class AddCorrectionRender extends MultigridRender {
     gl.bindVertexArray(this.vaos[level]);
     gl.drawArrays(gl.POINTS, 0, this.coords[level].length);
     gl.bindVertexArray(null);
+    this.pressure.swap();
   }
 }
 

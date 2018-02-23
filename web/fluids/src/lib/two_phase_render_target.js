@@ -69,5 +69,14 @@ export class TwoPhaseRenderTarget {
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebufferB);
     this.gl.viewport(0, 0, this.width, this.height);
   }
+
+  swap() {
+    let tmpFb = this.framebufferA;
+    let tmpTex = this.textureA;
+    this.framebufferA = this.framebufferB;
+    this.textureA = this.textureB;
+    this.framebufferB = tmpFb;
+    this.textureB = tmpTex;
+  }
 }
 

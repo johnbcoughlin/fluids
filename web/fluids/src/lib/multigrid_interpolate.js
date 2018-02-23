@@ -7,8 +7,10 @@ export class MultigridInterpolatePressure {
   gl;
   nx;
   ny;
-  multigrid;
   pressure;
+  residuals;
+  multigrid;
+  residualsMultigrid;
 
   program;
   vaos;
@@ -16,13 +18,14 @@ export class MultigridInterpolatePressure {
 
   sourceLocation;
 
-  constructor(gl, nx, ny, multigrid, pressure) {
+  constructor(gl, nx, ny, pressure, residuals, multigrid, residualsMultigrid) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
-    this.multigrid = multigrid;
     this.pressure = pressure;
-
+    this.residuals = residuals;
+    this.multigrid = multigrid;
+    this.residualsMultigrid = residualsMultigrid;
     this.initialize(gl);
   }
 
@@ -137,12 +140,12 @@ export class MultigridInterpolatePressure {
 
     this.multigrid.renderFromA(this.sourceLocation);
     if (level === 0) {
-      this.pressure.renderToB();
+      this.residuals.renderToB();
       this.gl.uniformMatrix4fv(
           this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
     } else {
-      this.multigrid.renderToB();
+      this.residualsMultigrid.renderToB();
       this.gl.uniformMatrix4fv(
           this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));

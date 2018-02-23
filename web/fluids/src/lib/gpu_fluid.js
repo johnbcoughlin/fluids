@@ -44,7 +44,7 @@ export class GPUFluid {
 
   constructor(gl) {
     this.gl = gl;
-    const n = 64;
+    const n = 10;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -109,7 +109,7 @@ export class GPUFluid {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
     this.multigrid = new TwoPhaseRenderTarget(gl, "multigrid", gl.TEXTURE7, 7, () => {
@@ -164,7 +164,12 @@ export class GPUFluid {
   render() {
     this.bodyForcesRender.render();
     this.divergenceRender.render();
-    this.step();
+    for (let i = 0; i < 7; i++) {
+      this.step();
+    }
+    this.errorCorrectionJacobiRender.render(0);
+    this.pressureResidualsRender.render(0);
+    this.canvasRender.render();
   }
 
   step() {
@@ -173,9 +178,10 @@ export class GPUFluid {
     this.pressureResidualsRender.render(0);
     this.restrictResidualsRender.restrictFrom(0);
     this.errorCorrectionJacobiRender.render(1);
+    // this.pressureResidualsRender.render(1);
     this.interpolatePressureRender.interpolateTo(0);
     this.addCorrectionRender.render(0);
-    this.canvasRender.render();
+    this.canvasRender.render2();
     // requestAnimationFrame(() => this.step());
   }
 }

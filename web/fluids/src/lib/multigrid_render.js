@@ -71,7 +71,7 @@ export class MultigridRender {
 
       this.initializeLevel(level, levelNx, levelNy, offset);
 
-      offset += Math.max(levelNx, levelNy);
+      offset += Math.max(levelNx, levelNy) + 1;
       levelNx = Math.floor(levelNx / 2);
       levelNy = Math.floor(levelNy / 2);
       level += 1;

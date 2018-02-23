@@ -57,9 +57,11 @@ export class MultigridRestrictionRender {
       const targetLevelNy = Math.floor(sourceLevelNy / 2);
       for (let i = 0; i < targetLevelNx; i++) {
         for (let j = 0; j < targetLevelNy; j++) {
-          levelCoords.push([
-            // the coordinates of the target of the restriction
+          const vertexCoords = [
             i + offset, j + offset,
+          ];
+          vertexCoords.push(
+            // the coordinates of the target of the restriction
             // the coordinates of the source grid points which contribute to the target
             2 * i - 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
             2 * i - 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
@@ -70,7 +72,8 @@ export class MultigridRestrictionRender {
             2 * i + 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
             2 * i + 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
             2 * i + 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16
-          ]);
+          );
+          levelCoords.push(vertexCoords);
         }
       }
       this.coords[sourceLevel] = levelCoords;

@@ -97,7 +97,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.pressure.renderFromA(this.uniformTextureLocation);
+    this.residuals.renderFromA(this.uniformTextureLocation);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
     renderToCanvas(this.gl);
@@ -110,7 +110,7 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.multigrid.renderFromA(this.uniformTextureLocation);
+    this.residualsMultigrid.renderFromA(this.uniformTextureLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -152,14 +152,14 @@ void main() {
   int water = texture(waterMask, texcoords.xy).x;
   int air = texture(airMask, texcoords.xy).x;
   
-  // if (water != 1 && air != 1) {
-  //   outColor = vec4(0.0, 0.0, 0.0, 1.0);
-  // } else if (air == 1) {
-  //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  if (pressure > 0.0) {
-    outColor = vec4(0.0, 0.0, pressure * 10.0, 1.0);
+  if (water != 1 && air != 1) {
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+  } else if (air == 1) {
+    outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  } else if (pressure > 0.0) {
+    outColor = vec4(0.0, 0.0, pressure * 500.0 , 1.0);
   } else {
-    outColor = vec4(abs(pressure), 0.0, 0.0, 1.0);
+    outColor = vec4(abs(pressure) * 500.0, 0.0, 0.0, 1.0);
   }
 }
 `;

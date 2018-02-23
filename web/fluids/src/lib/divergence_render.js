@@ -77,9 +77,9 @@ export class DivergenceRender {
     const gridcoordsAttributeLocation = gl.getAttribLocation(program, "a_gridcoords");
     const buffer = gl.createBuffer();
     this.gridcoords = [];
-    for (let i = 0; i < this.nx - 1; i++) {
+    for (let i = 0; i < this.nx; i++) {
       for (let j = 0; j < this.ny; j++) {
-        this.gridcoords.push(i, j, i + 1, j);
+        this.gridcoords.push(i, j);
       }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -97,7 +97,7 @@ export class DivergenceRender {
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.gridcoords.length / 2);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.gridcoords.length / 2);
     this.gl.bindVertexArray(null);
   }
 }
@@ -112,6 +112,7 @@ uniform mat4 toGridClipcoords;
 void main() {
   v_gridcoords = a_gridcoords;
   gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
+  gl_PointSize = 1.0;
 }
 `;
 

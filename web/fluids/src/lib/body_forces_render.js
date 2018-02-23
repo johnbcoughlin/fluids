@@ -57,8 +57,8 @@ export class BodyForcesRender {
     this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "velocityYTexture");
 
-    gl.uniform1f(gl.getUniformLocation(this.program, "dt"), false, this.dt);
-    gl.uniform1f(gl.getUniformLocation(this.program, "g"), false, this.g);
+    gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
+    gl.uniform1f(gl.getUniformLocation(this.program, "g"), this.g);
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toVelocityYClipcoords"),
         false, toVelocityYClipcoords(this.nx, this.ny));
@@ -74,10 +74,10 @@ export class BodyForcesRender {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityYGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];
-    for (let i = 0; i < this.nx-1; i++) {
+    for (let i = 0; i < this.nx; i++) {
       for (let j = 0; j < this.ny+1; j++) {
         // staggered grid
-        this.positions.push(i, j, i+1, j);
+        this.positions.push(i, j);
       }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -94,18 +94,7 @@ export class BodyForcesRender {
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.positions.length / 2);
-    this.gl.bindVertexArray(null);
-  }
-
-  render2() {
-    this.gl.useProgram(this.program);
-    this.velocityY.renderFromB(this.uniformTextureLocation);
-    this.velocityY.renderToA();
-    this.gl.bindVertexArray(this.vao);
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.positions.length / 2);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
   }
 }
@@ -136,7 +125,7 @@ in vec2 velocityYTexcoords;
 uniform float dt;
 uniform float g;
 uniform sampler2D velocityYTexture;
-uniform lowp usampler2D waterMask;
+uniform mediump isampler2D waterMask;
 uniform mat4 toGridTexcoords;
  
 out float new_velocityY;
@@ -144,12 +133,11 @@ out float new_velocityY;
 void main() {
   vec4 up = toGridTexcoords * vec4(v_velocityYGridcoords.xy, 0.0, 1.0);
   vec4 down = toGridTexcoords * vec4(v_velocityYGridcoords.x, v_velocityYGridcoords.y - 1.0, 0.0, 1.0);
-  uint water_up = texture(waterMask, up.xy).x;
-  uint water_down = texture(waterMask, down.xy).x;
-  if (water_up > uint(0) && water_down > uint(0)) {
+  int water_up = texture(waterMask, up.xy).x;
+  int water_down = texture(waterMask, down.xy).x;
+  if (water_up == 1 && water_down == 1) {
     float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
-    // new_velocityY = velocityY + g * dt;
-    new_velocityY = 0.9;
+    new_velocityY = velocityY + g * dt;
   } else {
     new_velocityY = 0.0;
   }

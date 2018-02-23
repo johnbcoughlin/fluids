@@ -46,12 +46,6 @@ export class ResidualsRender extends MultigridRender {
     gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
     gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(program, "toGridClipcoords"),
-        false, toGridClipcoords(this.nx, this.ny));
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(program, "toGridTexcoords"),
-        false, toGridTexcoords(this.nx, this.ny));
   }
 
   bindCoordinateArrays(gl, program) {
@@ -61,14 +55,28 @@ export class ResidualsRender extends MultigridRender {
   }
 
   render(level) {
+    const gl = this.gl;
+    const program = this.program;
     this.gl.useProgram(this.program);
     this.waterMask.renderFromA(this.waterMaskLocation);
     this.airMask.renderFromA(this.airMaskLocation);
     if (level === 0) {
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridClipcoords"),
+          false, toGridClipcoords(this.nx, this.ny));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridTexcoords"),
+          false, toGridTexcoords(this.nx, this.ny));
       this.residuals.renderFromA(this.residualsLocation);
       this.pressure.renderFromA(this.solutionLocation);
       this.residuals.renderToB();
     } else {
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridClipcoords"),
+          false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(program, "toGridTexcoords"),
+          false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
       this.residualsMultigrid.renderFromA(this.residualsLocation);
       this.multigrid.renderFromA(this.solutionLocation);
       this.residualsMultigrid.renderToB();

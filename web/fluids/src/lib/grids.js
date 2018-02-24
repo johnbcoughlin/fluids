@@ -4,7 +4,7 @@ export const toGridClipcoords = (nx, ny) => {
     2 / nx, 0, 0, 0,
     0, 2 / ny, 0, 0,
     0, 0, 1, 0,
-    -1, -1, 0, 1
+    -1 + 1 / nx, -1 + 1 / ny, 0, 1
   ];
 };
 
@@ -64,26 +64,79 @@ export const gridPointVertices = (nx, ny) => {
   return positions;
 };
 
+const airBorder = (ny) => {
+  return ny - Math.floor(ny / 4) - 0.5;
+};
+
+const solidBorderLeft = (nx) => {
+  return Math.floor(nx / 4) - 0.5;
+};
+
+const solidBorderRight = (nx) => {
+  return nx - Math.floor(nx / 4) - 0.5;
+};
+
+const solidBorderBottom = (ny) => {
+  return Math.floor(ny / 4) - 0.5;
+};
+
+export const waterMask = (nx, ny) => {
+  const result = [];
+  console.log(airBorder(ny));
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      if ((i > solidBorderLeft(nx)) &&
+          (i < solidBorderRight(nx)) &&
+          (j > solidBorderBottom(ny)) &&
+          (j < airBorder(ny))) {
+        result.push(1);
+      } else {
+        result.push(0);
+      }
+    }
+  }
+  return result;
+};
+
 export const airDistances = (nx, ny) => {
   const result = [];
-  const borderLeft = nx / 4 - 0.5;
-  const borderRight = nx - nx / 4 - 0.5;
-  const borderBottom = ny - ny / 4 - 0.5;
+  const borderLeft = solidBorderLeft(nx);
+  const borderRight = solidBorderRight(nx);
+  const borderBottom = airBorder(ny);
+  const isWater = (i, j) => (i > borderLeft && i < borderRight && j > borderBottom);
+
+  const search = (applyOffset, i, j) => {
+    let upperBound = Math.max(nx, ny);
+    let lowerBound = 0.0;
+    if (!isWater(...applyOffset(i, j, upperBound))) {
+      return upperBound;
+    }
+    while (!isWater(...applyOffset(i, j, lowerBound)) && (upperBound - lowerBound) < 0.05) {
+      const testPoint = (upperBound + lowerBound) / 2;
+      if (isWater(...applyOffset(i, j, testPoint))) {
+        upperBound = testPoint;
+      } else {
+        lowerBound = testPoint;
+      }
+    }
+    return lowerBound;
+  };
+
+  search((a, b, offset) => [a, b + offset], 4, 6);
+
   // backwards iteration because texImage2D transposes.
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
+      if (i === borderLeft || i === borderRight || j === borderBottom) {
+        throw new Error("border coincided with grid point");
+      }
       const point = [];
-      if (i > borderLeft && i < borderRight && j > borderBottom) {
+      if (isWater(i, j)) {
         point.push(0, 0, 0, 0);
+      } else if (i < borderLeft || i > borderRight) {
+        point.push(nx, nx, ny, ny);
       } else {
-        // do the left
-        point.push(i < borderLeft ? nx : (i < borderRight ? 0 : i - borderRight));
-        // right
-        point.push(i < borderLeft ? borderLeft - i : (i < borderRight ? 0 : nx));
-        // bottom
-        point.push(j < borderBottom ? ny : 0);
-        // top
-        point.push(j < borderBottom ? borderBottom - j : 0);
+        point.push(nx, nx, ny, borderBottom - j);
       }
       result.push(point);
     }
@@ -94,12 +147,15 @@ export const airDistances = (nx, ny) => {
 
 export const solidDistances = (nx, ny) => {
   const result = [];
-  const borderLeftEnd = nx / 4 - 0.5;
-  const borderRightStart = nx - nx / 4 - 0.5;
-  const borderBottomEnd = ny / 4 - 0.5;
+  const borderLeftEnd = solidBorderLeft(nx);
+  const borderRightStart = solidBorderRight(nx);
+  const borderBottomEnd = solidBorderBottom(ny);
   // backwards iteration because texImage2D transposes.
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
+      if (i === borderLeftEnd || i === borderRightStart || j === borderBottomEnd) {
+        throw new Error("border coincided with grid point");
+      }
       const point = [];
       if (i < borderLeftEnd || i > borderRightStart || j < borderBottomEnd) {
         point.push(0, 0, 0, 0);

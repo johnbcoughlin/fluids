@@ -19,7 +19,7 @@ class App extends Component {
             <h1 className="App-title">Welcome to React</h1>
           </header>
           <div>
-            <canvas width={1000} height={1000}
+            <canvas width={600} height={600}
                     ref={(canvas) => {
                       this.initializeCanvas(canvas);
                     }}/>

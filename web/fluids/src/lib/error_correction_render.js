@@ -8,11 +8,13 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   dy;
   dt;
   waterMask;
-  airMask;
+  airDistance;
+  solidDistance;
 
   toFinestGridTexcoords;
   waterMaskLocation;
-  airMaskLocation;
+  airDistanceLocation;
+  solidDistanceLocation;
   solutionLocation;
   residualsLocation;
 
@@ -23,7 +25,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               dy: num,
               dt: num,
               waterMask: TwoPhaseRenderTarget,
-              airMask: TwoPhaseRenderTarget,
+              airDistance: TwoPhaseRenderTarget,
+              solidDistance: TwoPhaseRenderTarget,
               pressure: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
@@ -34,13 +37,15 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
-    this.airMask = airMask;
+    this.airDistance = airDistance;
+    this.solidDistance = solidDistance;
     this.initialize(gl);
   }
 
   initializeUniforms(gl, program) {
     this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
-    this.airMaskLocation = gl.getUniformLocation(program, "airMask");
+    this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
+    this.solidDistanceLocation = gl.getUniformLocation(program, "solidDistance");
     this.solutionLocation = gl.getUniformLocation(program, "solution");
     this.residualsLocation = gl.getUniformLocation(program, "residuals");
 
@@ -51,10 +56,17 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.toFinestGridTexcoords[level] = toGridTexcoordsWithOffset(levelNx, levelNy, offset);
   }
 
+  vertexAttributeValues(level, i, j, offset) {
+    return [i + offset, j + offset, i * Math.pow(2, level), j * Math.pow(2, level)];
+  }
+
   bindCoordinateArrays(gl, program) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     gl.enableVertexAttribArray(gridcoordsLocation);
-    gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 0);
+    const finestGridcoordsLocation = gl.getAttribLocation(program, "finest_gridcoords");
+    gl.enableVertexAttribArray(finestGridcoordsLocation);
+    gl.vertexAttribPointer(finestGridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
   }
 
   render(level) {
@@ -94,7 +106,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
 
   renderAToB(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
     this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airMask.renderFromA(this.airMaskLocation);
+    this.airDistance.renderFromA(this.airDistanceLocation);
     residuals.renderFromA(this.residualsLocation);
     solution.renderFromA(this.solutionLocation);
     solution.renderToB();
@@ -105,7 +117,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
 
   renderBToA(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
     this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airMask.renderFromA(this.airMaskLocation);
+    this.airDistance.renderFromA(this.airDistanceLocation);
     residuals.renderFromA(this.residualsLocation);
     solution.renderFromB(this.solutionLocation);
     solution.renderToA();
@@ -117,13 +129,15 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
 
 const vertexShaderSource = `
 in vec2 a_gridcoords;
+in vec2 finest_gridcoords;
 
 uniform mat4 toGridClipcoords;
 uniform float dx;
 uniform float dy;
 uniform float dt;
 uniform mediump isampler2D waterMask;
-uniform mediump isampler2D airMask;
+uniform sampler2D airDistance;
+uniform sampler2D solidDistance;
 uniform sampler2D solution;
 uniform sampler2D residuals;
 
@@ -137,34 +151,24 @@ void main() {
   gl_PointSize = 1.0;
   
   // First refer to the finest grid discretization for mask values
-  vec2 here = (toFinestGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
-  int water_here = texture(waterMask, here).x;
-  if (water_here == 0) {
+  ivec2 here = ivec2(finest_gridcoords);
+  bool water_here = texelFetch(waterMask, here, 0).x == 1;
+  if (!water_here) {
     new_solution = 0.0;
     return;
   }
   
-  vec2 left = (toFinestGridTexcoords * vec4((a_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 right = (toFinestGridTexcoords * vec4((a_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 up = (toFinestGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
-  vec2 down = (toFinestGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
+  int water_left = texelFetch(waterMask, here - ivec2(1, 0), 0).x;
+  int water_right = texelFetch(waterMask, here + ivec2(1, 0), 0).x;
+  int water_down = texelFetch(waterMask, here - ivec2(0, 1), 0).x;
+  int water_up = texelFetch(waterMask, here + ivec2(0, 1), 0).x;
   
-  int water_left = texture(waterMask, left).x;
-  int water_right = texture(waterMask, right).x;
-  int water_up = texture(waterMask, up).x;
-  int water_down = texture(waterMask, down).x;
-  int air_left = texture(airMask, left).x;
-  int air_right = texture(airMask, right).x;
-  int air_up = texture(airMask, up).x;
-  int air_down = texture(airMask, down).x;
+  int air_left = texelFetch(airDistance, here, 0).x < 1.0 ? 1 : 0;
+  int air_right = texelFetch(airDistance, here, 0).y < 1.0 ? 1 : 0;
+  int air_down = texelFetch(airDistance, here, 0).z < 1.0 ? 1 : 0;
+  int air_up = texelFetch(airDistance, here, 0).w < 1.0 ? 1 : 0;
   
   // Then refer to the multigrid discretization for current vector values 
-  here = (toGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
-  left = (toGridTexcoords * vec4((a_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  right = (toGridTexcoords * vec4((a_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
-  down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
-  
   ivec2 ihere = ivec2(a_gridcoords.xy);
   float solution_left = texelFetch(solution, ihere + ivec2(-1, 0), 0).x;
   float solution_right = texelFetch(solution, ihere + ivec2(1, 0), 0).x;

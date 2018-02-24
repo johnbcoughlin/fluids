@@ -52,7 +52,12 @@ export class MultigridRender {
 
   setupPositions(gl) {
     this.vaos[0] = gl.createVertexArray();
-    this.coords[0] = gridPointVertices(this.nx, this.ny);
+    this.coords[0] = [];
+    for (let i = 0; i < this.nx; i++) {
+      for (let j = 0; j < this.ny; j++) {
+        this.coords[0].push(this.vertexAttributeValues(0, i, j, 0));
+      }
+    }
 
     let level = 1;
     let levelNx = Math.floor(this.nx / 2);

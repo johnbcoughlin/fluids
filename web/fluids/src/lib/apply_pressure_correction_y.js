@@ -1,25 +1,27 @@
 // @flow
 
-import {createProgram, loadShader} from "../gl_util";
-import {toGridTexcoords, toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import {createProgram, loadShader} from "../gl_util";
+import {toVelocityYClipcoords} from "./grids";
 
-export class BodyForcesRender {
+export class ApplyPressureCorrectionY {
   gl;
   nx;
   dx;
   ny;
   dy;
   dt;
-  g;
-  solidDistance;
+  pressure;
+  velocityX;
   velocityY;
+  waterMask;
 
   program;
   vao;
   positions;
-  solidDistanceLocation;
-  uniformTextureLocation;
+  velocityYLocation;
+  waterMaskLocation;
+  pressureLocation;
 
   constructor(gl: any,
               nx: num,
@@ -27,24 +29,26 @@ export class BodyForcesRender {
               ny: num,
               dy: num,
               dt: num,
-              g: num,
-              solidDistance: TwoPhaseRenderTarget,
-              velocityY: TwoPhaseRenderTarget) {
+              pressure: TwoPhaseRenderTarget,
+              velocityX: TwoPhaseRenderTarget,
+              velocityY: TwoPhaseRenderTarget,
+              waterMask: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
     this.ny = ny;
     this.dy = dy;
     this.dt = dt;
-    this.g = g;
-    this.solidDistance = solidDistance;
+    this.pressure = pressure;
+    this.velocityX = velocityX;
     this.velocityY = velocityY;
+    this.waterMask = waterMask;
     this.initialize(gl);
   }
 
   initialize(gl) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, velocityYVertexShaderSource);
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, velocityYFragmentShaderSource);
+    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
 
     // don't forget
@@ -54,11 +58,13 @@ export class BodyForcesRender {
     this.setupPositions(gl, this.program);
     gl.bindVertexArray(null);
 
-    this.solidDistanceLocation = gl.getUniformLocation(this.program, "solidDistance");
-    this.uniformTextureLocation = gl.getUniformLocation(this.program, "velocityYTexture");
+    this.velocityYLocation = gl.getUniformLocation(this.program, "velocityY");
+    this.pressureLocation = gl.getUniformLocation(this.program, "pressure");
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
 
+    gl.uniform1f(gl.getUniformLocation(this.program, "dy"), this.dy);
     gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
-    gl.uniform1f(gl.getUniformLocation(this.program, "g"), this.g);
+
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toVelocityYClipcoords"),
         false, toVelocityYClipcoords(this.nx, this.ny));
@@ -82,25 +88,28 @@ export class BodyForcesRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.solidDistance.renderFromA(this.solidDistanceLocation);
-    this.velocityY.renderFromA(this.uniformTextureLocation);
-    this.velocityY.renderToB();
+    this.velocityY.renderFromB(this.velocityYLocation);
+    this.velocityY.renderToA();
+    this.waterMask.renderFromA(this.waterMaskLocation);
+    this.pressure.renderFromA(this.pressureLocation);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
+    this.velocityY.swap();
   }
 }
 
-const velocityYVertexShaderSource = `
+const vertexShaderSource = `
 in vec4 velocityYGridcoords;
 
 uniform mat4 toVelocityYClipcoords;
+uniform mediump isampler2D waterMask;
+uniform sampler2D velocityY;
+uniform sampler2D pressure;
+uniform float dy;
 uniform float dt;
-uniform float g;
-uniform sampler2D velocityYTexture;
-uniform sampler2D solidDistance;
 
 out float value;
 
@@ -109,25 +118,24 @@ void main() {
   gl_PointSize = 1.0;
   
   ivec2 here = ivec2(velocityYGridcoords.xy);
-  ivec2 up = here;
-  ivec2 down = here - ivec2(0, 1);
+  bool water_up = texelFetch(waterMask, here, 0).x == 1;
+  bool water_down = texelFetch(waterMask, here - ivec2(0, 1), 0).x == 1;
   
-  bool solid_up = max4(texelFetch(solidDistance, up, 0)) == 0.0;
-  bool solid_down = max4(texelFetch(solidDistance, down, 0)) == 0.0;
-  
-  if (!solid_down && !solid_up) {
-    float velocityY = texelFetch(velocityYTexture, here, 0).x;
-    value = velocityY + g * dt;
-  } else {
+  if (!water_up || !water_down) {
     value = 0.0;
+    return;
   }
+  float velocityYHere = texelFetch(velocityY, here, 0).x;
+  float pressure_up = texelFetch(pressure, here, 0).x;
+  float pressure_down = texelFetch(pressure, here - ivec2(0, 1), 0).x;
+  float p_grad = (pressure_up - pressure_down) / dy;
+  value = velocityYHere + p_grad * dt;
 }
 `;
 
-const velocityYFragmentShaderSource = `
-precision mediump float;
-
+const fragmentShaderSource = `
 in float value;
+
 out float Value;
 
 void main() {

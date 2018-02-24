@@ -108,7 +108,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.pressure.renderFromA(this.uniformTextureLocation);
+    this.velocityY.renderFromA(this.uniformTextureLocation);
     this.airDistance.renderFromA(this.airDistanceLocation);
     this.solidDistance.renderFromA(this.solidDistanceLocation);
     renderToCanvas(this.gl);
@@ -142,7 +142,7 @@ uniform mat4 toGridClipcoords;
 
 void main() {
   v_gridcoords = a_gridcoords;
-  gl_Position = toGridClipcoords * a_gridcoords;
+  gl_Position = toGridClipcoords * (a_gridcoords - vec4(0.5, 0.5, 0.0, 0.0));
 }
 `;
 
@@ -169,14 +169,14 @@ void main() {
   float p = texelFetch(u_texture, here, 0).x;
   
   if (!water && !air) {
-    outColor = vec4(0.2, 0.0, 0.0, 1.0);
+    outColor = vec4(0.2, 0.2, 0.2, 1.0);
   } else if (air) {
     outColor = vec4(0.90, 0.90, 0.97, 1.0);
   } else 
-  if (p > 0.0) {
-    outColor = vec4(0.0, 0.0, p * 50.0, 1.0);
+  if (p < 0.0981 * 100.0 && p > 0.097 * 100.0) {
+    outColor = vec4(0.0, 0.0, p, 1.0);
   } else {
-    outColor = vec4(abs(p) * 50.0, 0.0, 0.0, 1.0);
+    outColor = vec4(abs(p) / 3.0, 0.0, 0.0, 1.0);
   }
 }
 `;

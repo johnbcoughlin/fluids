@@ -11,8 +11,8 @@ export class CanvasRender {
   velocityX;
   velocityY;
 
-  waterMask;
-  airMask;
+  airDistance;
+  solidDistance;
   pressure;
   residuals;
   multigrid;
@@ -20,8 +20,8 @@ export class CanvasRender {
 
   program;
   vao;
-  waterMaskLocation;
-  airMaskLocation;
+  solidDistanceLocation;
+  airDistanceLocation;
   uniformTextureLocation;
 
   constructor(gl: any,
@@ -29,8 +29,8 @@ export class CanvasRender {
               ny: num,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,
-              waterMask: TwoPhaseRenderTarget,
-              airMask: TwoPhaseRenderTarget,
+              airDistance: TwoPhaseRenderTarget,
+              solidDistance: TwoPhaseRenderTarget,
               pressure: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
@@ -40,8 +40,8 @@ export class CanvasRender {
     this.ny = ny;
     this.velocityX = velocityX;
     this.velocityY = velocityY;
-    this.waterMask = waterMask;
-    this.airMask = airMask;
+    this.airDistance = airDistance;
+    this.solidDistance = solidDistance;
     this.pressure = pressure;
     this.residuals = residuals;
     this.multigrid = multigrid;
@@ -62,8 +62,8 @@ export class CanvasRender {
     gl.bindVertexArray(null);
 
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "u_texture");
-    this.airMaskLocation = gl.getUniformLocation(this.program, "airMask");
-    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
+    this.airDistanceLocation = gl.getUniformLocation(this.program, "airDistance");
+    this.solidDistanceLocation = gl.getUniformLocation(this.program, "solidDistance");
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toGridClipcoords"),
@@ -76,6 +76,17 @@ export class CanvasRender {
   setupPositions(gl, program) {
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    const vertices = [
+      // top right triangle
+      0, this.ny,
+      this.nx, this.ny,
+      this.nx, 0,
+
+      // bottom left triangle
+      0, 0,
+      this.nx, 0,
+      0, this.ny
+    ];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       // top right triangle
       0, this.ny,
@@ -97,9 +108,9 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.residuals.renderFromA(this.uniformTextureLocation);
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airMask.renderFromA(this.airMaskLocation);
+    this.pressure.renderFromA(this.uniformTextureLocation);
+    this.airDistance.renderFromA(this.airDistanceLocation);
+    this.solidDistance.renderFromA(this.solidDistanceLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -110,7 +121,9 @@ export class CanvasRender {
 
   render2() {
     this.gl.useProgram(this.program);
-    this.residualsMultigrid.renderFromA(this.uniformTextureLocation);
+    this.residuals.renderFromA(this.uniformTextureLocation);
+    this.airDistance.renderFromA(this.airDistanceLocation);
+    this.solidDistance.renderFromA(this.solidDistanceLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -120,7 +133,7 @@ export class CanvasRender {
   }
 }
 
-const canvasVertexShaderSource = `#version 300 es
+const canvasVertexShaderSource = `
 in vec4 a_gridcoords;
 
 out vec4 v_gridcoords;
@@ -133,7 +146,7 @@ void main() {
 }
 `;
 
-const canvasFragmentShaderSource = `#version 300 es
+const canvasFragmentShaderSource = `
 precision mediump float;
 
 in vec4 v_gridcoords;
@@ -142,24 +155,28 @@ out vec4 outColor;
 
 uniform mat4 toGridTexcoords;
 uniform sampler2D u_texture;
-uniform mediump isampler2D waterMask;
-uniform mediump isampler2D airMask;
+uniform mediump sampler2D airDistance;
+uniform mediump sampler2D solidDistance;
 
 void main() {
   vec4 texcoords = toGridTexcoords * v_gridcoords;
-  float pressure = texture(u_texture, texcoords.xy).x;
+  ivec2 here = ivec2(v_gridcoords.xy);
   
-  int water = texture(waterMask, texcoords.xy).x;
-  int air = texture(airMask, texcoords.xy).x;
+  bool solid = max4(texelFetch(solidDistance, here, 0)) == 0.0;
+  bool air = max4(texelFetch(airDistance, here, 0)) == 0.0;
+  bool water = !solid && !air;
+
+  float p = texelFetch(u_texture, here, 0).x;
   
-  if (water != 1 && air != 1) {
-    outColor = vec4(0.0, 0.0, 0.0, 1.0);
-  } else if (air == 1) {
+  if (!water && !air) {
+    outColor = vec4(0.2, 0.0, 0.0, 1.0);
+  } else if (air) {
     outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  } else if (pressure > 0.0) {
-    outColor = vec4(0.0, 0.0, pressure * 500.0 , 1.0);
+  } else 
+  if (p > 0.0) {
+    outColor = vec4(0.0, 0.0, p * 50.0, 1.0);
   } else {
-    outColor = vec4(abs(pressure) * 500.0, 0.0, 0.0, 1.0);
+    outColor = vec4(abs(p) * 50.0, 0.0, 0.0, 1.0);
   }
 }
 `;

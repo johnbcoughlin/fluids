@@ -7,7 +7,7 @@ export const loadShader = (gl, type, source) => {
 
   // Send the source to the shader object
 
-  gl.shaderSource(shader, source);
+  gl.shaderSource(shader, versionString + usefulFunctions + source);
 
   // Compile the shader program
 
@@ -91,3 +91,19 @@ export const resizeCanvasToDisplaySize = (canvas, multiplier) => {
   }
   return false;
 };
+
+const versionString: string = `#version 300 es
+precision mediump float;
+
+`;
+
+const usefulFunctions: string = `
+float max4(vec4 v) {
+  return max (max (max (v.x, v.y), v.z), v.w);
+}
+
+float max8(vec4 v, vec4 u) {
+  return max (max4(v), max4(u));
+}
+
+`;

@@ -9,6 +9,7 @@ import {MultigridRestrictionRender} from "./multigrid_restrict";
 import {ResidualsRender} from "./pressure_residuals_render";
 import {ErrorCorrectionJacobiRender} from "./error_correction_render";
 import {AddCorrectionRender} from "./add_correction_render";
+import {airDistances, solidDistances} from "./grids";
 
 export class GPUFluid {
   // WebGL2 Context
@@ -22,7 +23,7 @@ export class GPUFluid {
 
   // masks and indicators
   waterMask;
-  airMask;
+  airDistance;
 
   // render targets
   velocityX;
@@ -44,7 +45,7 @@ export class GPUFluid {
 
   constructor(gl) {
     this.gl = gl;
-    const n = 10;
+    const n = 12;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -69,20 +70,25 @@ export class GPUFluid {
       // this is important.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     }, 4, 4);
-    this.airMask = new TwoPhaseRenderTarget(gl, "air", gl.TEXTURE1, 1, () => {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, 4, 4, 0, gl.RED_INTEGER, gl.INT,
-          new Int32Array([
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0,
-            0, 1, 1, 0
-          ]));
+    this.airDistance = new TwoPhaseRenderTarget(gl, "air_distance", gl.TEXTURE1, 1, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, this.nx, this.ny, 0, gl.RGBA, gl.FLOAT,
+          new Float32Array([].concat(...airDistances(this.nx, this.ny))));
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       // this is important.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    }, 4, 4);
+    }, this.nx, this.ny);
+
+    this.solidDistance = new TwoPhaseRenderTarget(gl, "solid_distance", gl.TEXTURE2, 2, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, this.nx, this.ny, 0, gl.RGBA, gl.FLOAT,
+          new Float32Array([].concat(...solidDistances(this.nx, this.ny))));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      // this is important.
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    }, this.nx, this.ny);
 
     this.velocityX = new TwoPhaseRenderTarget(gl, "u_x", gl.TEXTURE3, 3, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx + 1, this.ny, 0, gl.RED, gl.FLOAT, null);
@@ -139,9 +145,9 @@ export class GPUFluid {
     );
 
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
-        this.g, this.waterMask, this.velocityY);
+        this.g, this.solidDistance, this.velocityY);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.residuals,
-        this.velocityX, this.velocityY, this.waterMask);
+        this.velocityX, this.velocityY, this.solidDistance, this.airDistance);
     this.pressureResidualsRender = new ResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid,
         this.residualsMultigrid);
@@ -152,35 +158,31 @@ export class GPUFluid {
         this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
+        this.dt, this.waterMask, this.airDistance, this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
 
     this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny, this.pressure, this.residuals,
         this.multigrid, this.residualsMultigrid);
 
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
-        this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
+        this.airDistance, this.solidDistance,
+        this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
   }
 
   render() {
     this.bodyForcesRender.render();
     this.divergenceRender.render();
-    for (let i = 0; i < 7; i++) {
-      this.step();
-    }
-    this.errorCorrectionJacobiRender.render(0);
-    this.pressureResidualsRender.render(0);
-    this.canvasRender.render();
+    this.step();
   }
 
   step() {
     console.log("frame");
     this.errorCorrectionJacobiRender.render(0);
-    this.pressureResidualsRender.render(0);
-    this.restrictResidualsRender.restrictFrom(0);
-    this.errorCorrectionJacobiRender.render(1);
+    // this.pressureResidualsRender.render(0);
+    // this.restrictResidualsRender.restrictFrom(0);
+    // this.errorCorrectionJacobiRender.render(1);
     // this.pressureResidualsRender.render(1);
-    this.interpolatePressureRender.interpolateTo(0);
-    this.addCorrectionRender.render(0);
+    // this.interpolatePressureRender.interpolateTo(0);
+    // this.addCorrectionRender.render(0);
     this.canvasRender.render2();
     // requestAnimationFrame(() => this.step());
   }

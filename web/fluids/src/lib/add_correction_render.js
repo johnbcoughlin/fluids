@@ -55,7 +55,7 @@ export class AddCorrectionRender extends MultigridRender {
   }
 }
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 in vec4 a_gridcoords;
 
 uniform sampler2D solution;
@@ -76,7 +76,7 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision mediump float;
 
 in float value;

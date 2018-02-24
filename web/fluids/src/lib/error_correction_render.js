@@ -44,8 +44,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.solutionLocation = gl.getUniformLocation(program, "solution");
     this.residualsLocation = gl.getUniformLocation(program, "residuals");
 
-    gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
-    gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
 
@@ -68,6 +66,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
         false, this.toFinestGridTexcoords[level]);
 
     if (level === 0) {
+      gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
+      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
@@ -78,6 +78,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
       this.renderBToA(level, this.pressure, this.residuals);
 
     } else {
+      gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * 2);
+      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
@@ -113,7 +115,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   }
 }
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 in vec2 a_gridcoords;
 
 uniform mat4 toGridClipcoords;
@@ -163,13 +165,13 @@ void main() {
   up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
   down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
   
+  ivec2 ihere = ivec2(a_gridcoords.xy);
+  float solution_left = texelFetch(solution, ihere + ivec2(-1, 0), 0).x;
+  float solution_right = texelFetch(solution, ihere + ivec2(1, 0), 0).x;
+  float solution_up = texelFetch(solution, ihere + ivec2(0, 1), 0).x;
+  float solution_down = texelFetch(solution, ihere + ivec2(0, -1), 0).x;
   
-  float solution_left = texture(solution, left).x;
-  float solution_right = texture(solution, right).x;
-  float solution_up = texture(solution, up).x;
-  float solution_down = texture(solution, down).x;
-  
-  float residual_here = texture(residuals, here).x;
+  float residual_here = texelFetch(residuals, ihere, 0).x;
   
   float norm = dt / (dx * dx);
   float d = float(water_left + water_right + water_up + water_down + 
@@ -183,7 +185,7 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision mediump float;
 
 in float new_solution;

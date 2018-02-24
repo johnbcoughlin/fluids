@@ -36,12 +36,7 @@ export class MultigridInterpolatePressure {
     gl.useProgram(this.program);
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
 
-
     this.setupPositions(gl, this.program);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "beforeGridToTexcoords"),
-        false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
-
   }
 
   setupPositions(gl, program) {
@@ -160,17 +155,13 @@ export class MultigridInterpolatePressure {
   }
 }
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 in vec4 afterGridcoords;
 
 in vec4 contributor1;
 in vec4 contributor2;
 in vec4 contributor3;
 in vec4 contributor4;
-
-// the conversion for the level which is being interpolated from
-// we'll use this to query data points to combine in the interpolated level
-uniform mat4 beforeGridToTexcoords;
 
 // we have to convert the afterGridcoords to clip space
 uniform mat4 afterGridToClipcoords;
@@ -184,16 +175,14 @@ void main() {
   gl_PointSize = 1.0;
   
   value = 
-      texture(source, (beforeGridToTexcoords * contributor1).xy).x * contributor1.z +
-      texture(source, (beforeGridToTexcoords * contributor2).xy).x * contributor2.z +
-      texture(source, (beforeGridToTexcoords * contributor3).xy).x * contributor3.z +
-      texture(source, (beforeGridToTexcoords * contributor4).xy).x * contributor4.z;
+      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
+      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
+      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
+      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z;
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
-precision mediump float;
-
+const fragmentShaderSource = `
 in float value;
 
 out float Value;

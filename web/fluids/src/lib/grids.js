@@ -4,7 +4,7 @@ export const toGridClipcoords = (nx, ny) => {
     2 / nx, 0, 0, 0,
     0, 2 / ny, 0, 0,
     0, 0, 1, 0,
-    -1 + 1 / nx, -1 + 1 / ny, 0, 1
+    -1, -1, 0, 1
   ];
 };
 
@@ -62,4 +62,52 @@ export const gridPointVertices = (nx, ny) => {
     }
   }
   return positions;
+};
+
+export const airDistances = (nx, ny) => {
+  const result = [];
+  const borderLeft = nx / 4 - 0.5;
+  const borderRight = nx - nx / 4 - 0.5;
+  const borderBottom = ny - ny / 4 - 0.5;
+  // backwards iteration because texImage2D transposes.
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const point = [];
+      if (i > borderLeft && i < borderRight && j > borderBottom) {
+        point.push(0, 0, 0, 0);
+      } else {
+        // do the left
+        point.push(i < borderLeft ? nx : (i < borderRight ? 0 : i - borderRight));
+        // right
+        point.push(i < borderLeft ? borderLeft - i : (i < borderRight ? 0 : nx));
+        // bottom
+        point.push(j < borderBottom ? ny : 0);
+        // top
+        point.push(j < borderBottom ? borderBottom - j : 0);
+      }
+      result.push(point);
+    }
+  }
+  console.log(result);
+  return result;
+};
+
+export const solidDistances = (nx, ny) => {
+  const result = [];
+  const borderLeftEnd = nx / 4 - 0.5;
+  const borderRightStart = nx - nx / 4 - 0.5;
+  const borderBottomEnd = ny / 4 - 0.5;
+  // backwards iteration because texImage2D transposes.
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const point = [];
+      if (i < borderLeftEnd || i > borderRightStart || j < borderBottomEnd) {
+        point.push(0, 0, 0, 0);
+      } else {
+        point.push(i - borderLeftEnd, borderRightStart - i, j - borderBottomEnd, ny - j);
+      }
+      result.push(point);
+    }
+  }
+  return result;
 };

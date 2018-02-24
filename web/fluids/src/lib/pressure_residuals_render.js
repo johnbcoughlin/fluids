@@ -87,7 +87,7 @@ export class ResidualsRender extends MultigridRender {
   }
 }
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 in vec2 a_gridcoords;
 
 uniform mat4 toGridClipcoords;
@@ -151,7 +151,7 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision mediump float;
 
 in float new_residual;

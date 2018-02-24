@@ -1,6 +1,6 @@
 // @flow
 import {createProgram, loadShader} from "../gl_util";
-import {toGridClipcoords, toGridTexcoords} from "./grids";
+import {toGridClipcoords} from "./grids";
 
 export class MultigridRestrictionRender {
   gl;
@@ -33,10 +33,6 @@ export class MultigridRestrictionRender {
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
 
     this.setupPositions(gl, this.program);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "beforeGridToTexcoords"),
-        false, toGridTexcoords(this.nx, this.ny));
-
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "afterGridToClipcoords"),
         false, toGridClipcoords(this.residualsMultigrid.width, this.residualsMultigrid.height));
@@ -156,7 +152,7 @@ export class MultigridRestrictionRender {
   }
 }
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 in vec4 afterGridcoords;
 
 // The grid coordinates of the center of the restriction kernel in before-space
@@ -185,20 +181,20 @@ void main() {
   gl_PointSize = 1.0;
   
   float foo = 
-      texture(source, (beforeGridToTexcoords * contributor1).xy).x * contributor1.z +
-      texture(source, (beforeGridToTexcoords * contributor2).xy).x * contributor2.z +
-      texture(source, (beforeGridToTexcoords * contributor3).xy).x * contributor3.z +
-      texture(source, (beforeGridToTexcoords * contributor4).xy).x * contributor4.z +
-      texture(source, (beforeGridToTexcoords * contributor5).xy).x * contributor5.z +
-      texture(source, (beforeGridToTexcoords * contributor6).xy).x * contributor6.z +
-      texture(source, (beforeGridToTexcoords * contributor7).xy).x * contributor7.z +
-      texture(source, (beforeGridToTexcoords * contributor8).xy).x * contributor8.z +
-      texture(source, (beforeGridToTexcoords * contributor9).xy).x * contributor9.z;
+      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
+      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
+      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
+      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
+      texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
+      texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
+      texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
+      texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
+      texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
   value = foo;
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision mediump float;
 
 in float value;

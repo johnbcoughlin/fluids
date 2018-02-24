@@ -12,13 +12,13 @@ export class BodyForcesRender {
   dy;
   dt;
   g;
-  waterMask;
+  solidDistance;
   velocityY;
 
   program;
   vao;
   positions;
-  waterMaskLocation;
+  solidDistanceLocation;
   uniformTextureLocation;
 
   constructor(gl: any,
@@ -28,7 +28,7 @@ export class BodyForcesRender {
               dy: num,
               dt: num,
               g: num,
-              waterMask: TwoPhaseRenderTarget,
+              solidDistance: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
@@ -37,7 +37,7 @@ export class BodyForcesRender {
     this.dy = dy;
     this.dt = dt;
     this.g = g;
-    this.waterMask = waterMask;
+    this.solidDistance = solidDistance;
     this.velocityY = velocityY;
     this.initialize(gl);
   }
@@ -54,7 +54,7 @@ export class BodyForcesRender {
     this.setupPositions(gl, this.program);
     gl.bindVertexArray(null);
 
-    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
+    this.solidDistanceLocation = gl.getUniformLocation(this.program, "solidDistance");
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "velocityYTexture");
 
     gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
@@ -88,7 +88,7 @@ export class BodyForcesRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.waterMask.renderFromA(this.waterMaskLocation);
+    this.solidDistance.renderFromA(this.solidDistanceLocation);
     this.velocityY.renderFromA(this.uniformTextureLocation);
     this.velocityY.renderToB();
     this.gl.bindVertexArray(this.vao);
@@ -99,7 +99,7 @@ export class BodyForcesRender {
   }
 }
 
-const velocityYVertexShaderSource = `#version 300 es
+const velocityYVertexShaderSource = `
 in vec4 velocityYGridcoords;
 
 out vec2 v_velocityYGridcoords;
@@ -116,7 +116,7 @@ void main() {
 }
 `;
 
-const velocityYFragmentShaderSource = `#version 300 es
+const velocityYFragmentShaderSource = `
 precision mediump float;
 
 in vec2 v_velocityYGridcoords;
@@ -125,17 +125,18 @@ in vec2 velocityYTexcoords;
 uniform float dt;
 uniform float g;
 uniform sampler2D velocityYTexture;
-uniform mediump isampler2D waterMask;
+uniform sampler2D solidDistance;
 uniform mat4 toGridTexcoords;
  
 out float new_velocityY;
 
 void main() {
-  vec4 up = toGridTexcoords * vec4(v_velocityYGridcoords.xy, 0.0, 1.0);
-  vec4 down = toGridTexcoords * vec4(v_velocityYGridcoords.x, v_velocityYGridcoords.y - 1.0, 0.0, 1.0);
-  int water_up = texture(waterMask, up.xy).x;
-  int water_down = texture(waterMask, down.xy).x;
-  if (water_up == 1 && water_down == 1) {
+  ivec2 up = ivec2(v_velocityYGridcoords.xy);
+  ivec2 down = ivec2(v_velocityYGridcoords.xy) + ivec2(0, -1);
+  bool solid_down = max4(texelFetch(solidDistance, down, 0)) == 0.0;
+  bool solid_up = max4(texelFetch(solidDistance, up, 0)) == 0.0;
+  
+  if (!solid_down || solid_up) {
     float velocityY = texture(velocityYTexture, velocityYTexcoords).x;
     new_velocityY = velocityY + g * dt;
   } else {

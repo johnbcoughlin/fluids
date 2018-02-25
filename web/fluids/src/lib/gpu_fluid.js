@@ -13,6 +13,7 @@ import {airDistances, solidDistances, waterMask} from "./grids";
 import {ApplyPressureCorrectionY} from "./apply_pressure_correction_y";
 import App from "../App";
 import {ApplyPressureCorrectionX} from "./apply_pressure_correction_x";
+import {AdvectionRender} from "./advect_render";
 
 export class GPUFluid {
   // WebGL2 Context
@@ -36,6 +37,7 @@ export class GPUFluid {
   pressure;
   multigrid;
   residualsMultigrid;
+  dye;
 
   // render stages
   bodyForcesRender: BodyForcesRender;
@@ -47,17 +49,18 @@ export class GPUFluid {
   addCorrectionRender: AddCorrectionRender;
   applyPressureCorrectionYRender: ApplyPressureCorrectionY;
   applyPressureCorrectionXRender: ApplyPressureCorrectionX;
+  advectionRender: AdvectionRender;
   canvasRender: CanvasRender;
 
   constructor(gl) {
     this.gl = gl;
-    const n = 32;
+    const n = 200;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
     this.dy = 1.0 / n;
     this.dt = 0.01;
-    this.g = -9.8;
+    this.g = 0.0;
     this.initialize(gl);
   }
 
@@ -96,7 +99,7 @@ export class GPUFluid {
       for (let j = 0; j < this.ny; j++) {
         for (let i = 0; i < this.nx+1; i++) {
           if (i === this.nx / 2 && j === this.ny / 2) {
-            data.push(10.0);
+            data.push(1.0);
           } else {
             data.push(0.0);
           }
@@ -113,7 +116,7 @@ export class GPUFluid {
       for (let j = 0; j < this.ny+1; j++) {
         for (let i = 0; i < this.nx; i++) {
           if (i === this.nx / 2 && j === this.ny / 2) {
-            data.push(10.0);
+            data.push(1.0);
           } else {
             data.push(0.0);
           }
@@ -165,12 +168,29 @@ export class GPUFluid {
         this.ny + Math.floor(Math.log2(this.ny)) * 2
     );
 
+    this.dye = new TwoPhaseRenderTarget(gl, "dye", gl.TEXTURE9, 9, () => {
+      const data = [];
+      for (let j = 0; j < this.ny; j++) {
+        for (let i = 0; i < this.nx; i++) {
+          if (i === this.nx / 2) {
+            data.push(1.0);
+          } else {
+            data.push(0.0);
+          }
+        }
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, new Float32Array(data));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }, this.nx, this.ny);
+
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.g, this.solidDistance, this.velocityY);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.residuals,
         this.velocityX, this.velocityY, this.waterMask, this.solidDistance, this.airDistance);
     this.pressureResidualsRender = new ResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.waterMask, this.airMask, this.pressure, this.residuals, this.multigrid,
+        this.dt, this.waterMask, this.airDistance, this.pressure, this.residuals, this.multigrid,
         this.residualsMultigrid);
 
     this.restrictResidualsRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.residuals,
@@ -190,35 +210,45 @@ export class GPUFluid {
     this.applyPressureCorrectionXRender = new ApplyPressureCorrectionX(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
 
+    this.advectionRender = new AdvectionRender(this.gl, this.nx, this.dx, this.ny, this.dy, this.dt,
+        this.velocityX, this.velocityY, this.dye);
+
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,
-        this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
+        this.pressure, this.residuals, this.multigrid, this.residualsMultigrid,
+        this.dye);
   }
 
   render() {
     this.bodyForcesRender.render();
+    this.advectionRender.advectX();
+    this.advectionRender.advectY();
     this.divergenceRender.render();
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 20; i++) {
       this.step();
     }
     this.applyPressureCorrectionXRender.render();
     this.applyPressureCorrectionYRender.render();
+    this.advectionRender.advectDye();
     this.divergenceRender.render();
     this.canvasRender.render();
+    requestAnimationFrame(() => this.render());
   }
 
   step() {
-    console.log("frame");
     this.errorCorrectionJacobiRender.render(0);
-    // this.pressureResidualsRender.render(0);
-    // this.restrictResidualsRender.restrictFrom(0);
-    // this.errorCorrectionJacobiRender.render(1);
-    // this.pressureResidualsRender.render(1);
-    // this.interpolatePressureRender.interpolateTo(0);
-    // this.addCorrectionRender.render(0);
-    // this.applyPressureCorrectionYRender.render();
-    // this.divergenceRender.render();
-    // this.canvasRender.render();
+    this.errorCorrectionJacobiRender.render(0);
+    // this.level1();
     // requestAnimationFrame(() => this.step());
+  }
+
+  level1() {
+    this.pressureResidualsRender.render(0);
+    this.restrictResidualsRender.restrictFrom(0);
+    this.errorCorrectionJacobiRender.render(1);
+    this.errorCorrectionJacobiRender.render(1);
+    this.pressureResidualsRender.render(1);
+    this.interpolatePressureRender.interpolateTo(0);
+    this.addCorrectionRender.render(0);
   }
 }

@@ -82,7 +82,6 @@ const solidBorderBottom = (ny) => {
 
 export const waterMask = (nx, ny) => {
   const result = [];
-  console.log(airBorder(ny));
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       if ((i > solidBorderLeft(nx)) &&
@@ -141,7 +140,6 @@ export const airDistances = (nx, ny) => {
       result.push(point);
     }
   }
-  console.log(result);
   return result;
 };
 

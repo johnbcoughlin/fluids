@@ -17,6 +17,7 @@ export class CanvasRender {
   residuals;
   multigrid;
   residualsMultigrid;
+  dye;
 
   program;
   vao;
@@ -34,7 +35,8 @@ export class CanvasRender {
               pressure: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
-              residualsMultigrid: TwoPhaseRenderTarget) {
+              residualsMultigrid: TwoPhaseRenderTarget,
+              dye: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -46,6 +48,7 @@ export class CanvasRender {
     this.residuals = residuals;
     this.multigrid = multigrid;
     this.residualsMultigrid = residualsMultigrid;
+    this.dye = dye;
     this.initialize(gl);
   }
 
@@ -108,7 +111,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityY.renderFromA(this.uniformTextureLocation);
+    this.velocityX.renderFromA(this.uniformTextureLocation);
     this.airDistance.renderFromA(this.airDistanceLocation);
     this.solidDistance.renderFromA(this.solidDistanceLocation);
     renderToCanvas(this.gl);
@@ -172,11 +175,8 @@ void main() {
     outColor = vec4(0.2, 0.2, 0.2, 1.0);
   } else if (air) {
     outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  } else 
-  if (p < 0.0981 * 100.0 && p > 0.097 * 100.0) {
-    outColor = vec4(0.0, 0.0, p, 1.0);
   } else {
-    outColor = vec4(abs(p) / 3.0, 0.0, 0.0, 1.0);
+    outColor = vec4(p * 100.0, 0.0, 0.0, 1.0);
   }
 }
 `;

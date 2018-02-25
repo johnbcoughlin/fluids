@@ -106,4 +106,60 @@ float max8(vec4 v, vec4 u) {
   return max (max4(v), max4(u));
 }
 
+// the left face
+ivec2 stagger_left(ivec2 here) {
+  return here;
+}
+
+// the right face
+ivec2 stagger_right(ivec2 here) {
+  return here + ivec2(1, 0);
+}
+
+// the down face
+ivec2 stagger_down(ivec2 here) {
+  return here;
+}
+
+// the up face
+ivec2 stagger_up(ivec2 here) {
+  return here + ivec2(0, 1);
+}
+
+// the left neighbor
+ivec2 left(ivec2 here) {
+  return here - ivec2(1, 0);
+}
+
+// the right neighbor
+ivec2 right(ivec2 here) {
+  return here + ivec2(1, 0);
+}
+
+// the down neighbor
+ivec2 down(ivec2 here) {
+  return here - ivec2(0, 1);
+}
+
+// the up neighbor
+ivec2 up(ivec2 here) {
+  return here + ivec2(0, 1);
+}
+
+bool bitmask_left(isampler2D waterMask, ivec2 here) {
+  return texelFetch(waterMask, here + ivec2(-1, 0), 0).x == 1;
+}
+
+bool bitmask_right(isampler2D waterMask, ivec2 here) {
+  return texelFetch(waterMask, here + ivec2(1, 0), 0).x == 1;
+}
+
+bool bitmask_down(isampler2D waterMask, ivec2 here) {
+  return texelFetch(waterMask, here + ivec2(0, -1), 0).x == 1;
+}
+
+bool bitmask_up(isampler2D waterMask, ivec2 here) {
+  return texelFetch(waterMask, here + ivec2(0, 1), 0).x == 1;
+}
+
 `;

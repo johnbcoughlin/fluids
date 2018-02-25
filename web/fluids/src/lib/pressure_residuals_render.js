@@ -1,14 +1,14 @@
 // @flow
-import {toGridClipcoords, toGridTexcoords} from "./grids";
+import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class ResidualsRender extends MultigridRender {
   waterMask;
-  airMask;
+  airDistance;
 
   waterMaskLocation;
-  airMaskLocation;
+  airDistanceLocation;
   solutionLocation;
   residualsLocation;
 
@@ -19,7 +19,7 @@ export class ResidualsRender extends MultigridRender {
               dy: num,
               dt: num,
               waterMask: TwoPhaseRenderTarget,
-              airMask: TwoPhaseRenderTarget,
+              airDistance: TwoPhaseRenderTarget,
               pressure: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
@@ -29,7 +29,7 @@ export class ResidualsRender extends MultigridRender {
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
-    this.airMask = airMask;
+    this.airDistance = airDistance;
     this.initialize(gl);
   }
 
@@ -39,7 +39,7 @@ export class ResidualsRender extends MultigridRender {
 
   initializeUniforms(gl, program) {
     this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
-    this.airMaskLocation = gl.getUniformLocation(program, "airMask");
+    this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
     this.residualsLocation = gl.getUniformLocation(program, "residuals");
     this.solutionLocation = gl.getUniformLocation(program, "solution");
 
@@ -48,10 +48,17 @@ export class ResidualsRender extends MultigridRender {
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
 
+  vertexAttributeValues(level, i, j, offset) {
+    return [i + offset, j + offset, i * Math.pow(2, level), j * Math.pow(2, level)];
+  }
+
   bindCoordinateArrays(gl, program) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     gl.enableVertexAttribArray(gridcoordsLocation);
-    gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 0);
+    const finestGridcoordsLocation = gl.getAttribLocation(program, "finest_gridcoords");
+    gl.enableVertexAttribArray(finestGridcoordsLocation);
+    gl.vertexAttribPointer(finestGridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
   }
 
   render(level) {
@@ -59,14 +66,11 @@ export class ResidualsRender extends MultigridRender {
     const program = this.program;
     this.gl.useProgram(this.program);
     this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airMask.renderFromA(this.airMaskLocation);
+    this.airDistance.renderFromA(this.airDistanceLocation);
     if (level === 0) {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(program, "toGridTexcoords"),
-          false, toGridTexcoords(this.nx, this.ny));
       this.residuals.renderFromA(this.residualsLocation);
       this.pressure.renderFromA(this.solutionLocation);
       this.residuals.renderToB();
@@ -74,9 +78,6 @@ export class ResidualsRender extends MultigridRender {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(program, "toGridTexcoords"),
-          false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
       this.residualsMultigrid.renderFromA(this.residualsLocation);
       this.multigrid.renderFromA(this.solutionLocation);
       this.residualsMultigrid.renderToB();
@@ -89,15 +90,15 @@ export class ResidualsRender extends MultigridRender {
 
 const vertexShaderSource = `
 in vec2 a_gridcoords;
+in vec2 finest_gridcoords;
 
 uniform mat4 toGridClipcoords;
-uniform mat4 toGridTexcoords;
 
 uniform float dx;
 uniform float dy;
 uniform float dt;
 uniform mediump isampler2D waterMask;
-uniform mediump isampler2D airMask;
+uniform mediump sampler2D airDistance;
 uniform sampler2D residuals;
 uniform mediump sampler2D solution;
 
@@ -107,34 +108,30 @@ void main() {
   gl_Position = toGridClipcoords * vec4(a_gridcoords, 0.0, 1.0);
   gl_PointSize = 1.0;
   
-  vec2 here = (toGridTexcoords * vec4(a_gridcoords, 0.0, 1.0)).xy;
-  int water_here = texture(waterMask, here).x;
-  if (water_here == 0) {
+  ivec2 here = ivec2(finest_gridcoords);
+  bool water_here = texelFetch(waterMask, here, 0).x == 1;
+  if (!water_here) {
     new_residual = 0.0;
     return;
   }
   
-  vec2 left = (toGridTexcoords * vec4((a_gridcoords + vec2(-1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 right = (toGridTexcoords * vec4((a_gridcoords + vec2(1.0, 0.0)).xy, 0.0, 1.0)).xy;
-  vec2 up = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, 1.0)).xy, 0.0, 1.0)).xy;
-  vec2 down = (toGridTexcoords * vec4((a_gridcoords + vec2(0.0, -1.0)).xy, 0.0, 1.0)).xy;
+  int water_left = bitmask_left(waterMask, here) ? 1 : 0;
+  int water_right = bitmask_right(waterMask, here) ? 1 : 0;
+  int water_down = bitmask_down(waterMask, here) ? 1 : 0;
+  int water_up = bitmask_up(waterMask, here) ? 1 : 0;
+  int air_left = texelFetch(airDistance, here, 0).x < 0.5 ? 1 : 0;
+  int air_right = texelFetch(airDistance, here, 0).y < 0.5 ? 1 : 0;
+  int air_down = texelFetch(airDistance, here, 0).z < 0.5 ? 1 : 0;
+  int air_up = texelFetch(airDistance, here, 0).w < 0.5 ? 1 : 0;
   
-  int water_left = texture(waterMask, left).x;
-  int water_right = texture(waterMask, right).x;
-  int water_up = texture(waterMask, up).x;
-  int water_down = texture(waterMask, down).x;
-  int air_left = texture(airMask, left).x;
-  int air_right = texture(airMask, right).x;
-  int air_up = texture(airMask, up).x;
-  int air_down = texture(airMask, down).x;
+  here = ivec2(a_gridcoords);
+  float solution_left = texelFetch(solution, left(here), 0).x;
+  float solution_right = texelFetch(solution, right(here), 0).x;
+  float solution_down = texelFetch(solution, down(here), 0).x;
+  float solution_up = texelFetch(solution, up(here), 0).x;
   
-  float solution_left = texture(solution, left).x;
-  float solution_right = texture(solution, right).x;
-  float solution_up = texture(solution, up).x;
-  float solution_down = texture(solution, down).x;
-  
-  float solution_here = texture(solution, here).x;
-  float residual_here = texture(residuals, here).x;
+  float solution_here = texelFetch(solution, here, 0).x;
+  float residual_here = texelFetch(residuals, here, 0).x;
   
   float norm = dt / (dx * dx);
   int neighbors = water_left + water_right + water_up + water_down + 

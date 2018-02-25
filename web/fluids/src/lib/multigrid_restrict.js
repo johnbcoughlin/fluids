@@ -166,8 +166,6 @@ in vec4 contributor7;
 in vec4 contributor8;
 in vec4 contributor9;
 
-uniform mat4 beforeGridToTexcoords;
-
 // we have to convert the afterGridcoords to clip space
 uniform mat4 afterGridToClipcoords;
 

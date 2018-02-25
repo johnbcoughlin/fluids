@@ -90,7 +90,6 @@ export class BodyForcesRender {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
-    this.velocityY.swap();
   }
 }
 
@@ -132,6 +131,6 @@ in float value;
 out float Value;
 
 void main() {
-  Value = 10.0;
+  Value = value;
 }
 `;

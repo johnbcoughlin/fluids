@@ -79,17 +79,6 @@ export class CanvasRender {
   setupPositions(gl, program) {
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    const vertices = [
-      // top right triangle
-      0, this.ny,
-      this.nx, this.ny,
-      this.nx, 0,
-
-      // bottom left triangle
-      0, 0,
-      this.nx, 0,
-      0, this.ny
-    ];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       // top right triangle
       0, this.ny,
@@ -111,7 +100,7 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityX.renderFromA(this.uniformTextureLocation);
+    this.velocityY.renderFromA(this.uniformTextureLocation);
     this.airDistance.renderFromA(this.airDistanceLocation);
     this.solidDistance.renderFromA(this.solidDistanceLocation);
     renderToCanvas(this.gl);
@@ -176,7 +165,7 @@ void main() {
   } else if (air) {
     outColor = vec4(0.90, 0.90, 0.97, 1.0);
   } else {
-    outColor = vec4(p * 100.0, 0.0, 0.0, 1.0);
+    outColor = vec4(p, 0.0, 0.0, 1.0);
   }
 }
 `;

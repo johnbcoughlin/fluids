@@ -14,6 +14,7 @@ export class AdvectionRender {
   velocityX;
   velocityY;
   dye;
+  waterMask;
 
   program;
   velocityXVAO;
@@ -23,7 +24,7 @@ export class AdvectionRender {
   velocityYLocation;
   scalarFieldLocation;
 
-  constructor(gl, nx, dx, ny, dy, dt, velocityX, velocityY, dye) {
+  constructor(gl, nx, dx, ny, dy, dt, velocityX, velocityY, dye, waterMask) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -33,6 +34,7 @@ export class AdvectionRender {
     this.velocityX = velocityX;
     this.velocityY = velocityY;
     this.dye = dye;
+    this.waterMask = waterMask;
     this.initialize(gl);
   }
 
@@ -48,8 +50,15 @@ export class AdvectionRender {
     this.velocityXLocation = gl.getUniformLocation(this.program, "velocityX");
     this.velocityYLocation = gl.getUniformLocation(this.program, "velocityY");
     this.scalarFieldLocation = gl.getUniformLocation(this.program, "scalarField");
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
 
     gl.uniform1f(gl.getUniformLocation(this.program, "dt"), this.dt);
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toVelocityXTexcoords"),
+        false, toVelocityXTexcoords(this.nx, this.ny));
+    gl.uniformMatrix4fv(
+        gl.getUniformLocation(this.program, "toVelocityYTexcoords"),
+        false, toVelocityYTexcoords(this.nx, this.ny));
   }
 
   setupPositions(gl, program) {
@@ -112,6 +121,7 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toVelocityXTexcoords(this.nx, this.ny));
+    this.waterMask.renderFromA(this.waterMaskLocation);
     this.velocityX.renderFromB(this.velocityXLocation);
     this.velocityX.renderFromB(this.scalarFieldLocation);
     this.velocityY.renderFromB(this.velocityYLocation);
@@ -133,6 +143,7 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toVelocityYTexcoords(this.nx, this.ny));
+    this.waterMask.renderFromA(this.waterMaskLocation);
     this.velocityX.renderFromB(this.velocityXLocation);
     this.velocityY.renderFromB(this.velocityYLocation);
     this.velocityY.renderFromB(this.scalarFieldLocation);
@@ -142,7 +153,7 @@ export class AdvectionRender {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
-    this.velocityY.swap();
+    // this.velocityY.swap();
   }
 
   advectDye() {
@@ -154,6 +165,7 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toGridTexcoords(this.nx, this.ny));
+    this.waterMask.renderFromA(this.waterMaskLocation);
     this.velocityX.renderFromB(this.velocityXLocation);
     this.velocityY.renderFromB(this.velocityYLocation);
     this.dye.renderFromB(this.scalarFieldLocation);
@@ -168,28 +180,36 @@ export class AdvectionRender {
 }
 
 const vertexShaderSource = `
-in vec2 a_gridcoords;
+in vec4 a_gridcoords;
 
 uniform sampler2D scalarField;
 uniform sampler2D velocityX;
 uniform sampler2D velocityY;
+uniform mediump isampler2D waterMask;
 
 uniform mat4 toClipcoords;
 uniform mat4 toScalarTexcoords;
+uniform mat4 toVelocityXTexcoords;
+uniform mat4 toVelocityYTexcoords;
 uniform float dt;
 
 out float q;
 
 void main() {
-  gl_Position = toClipcoords * vec4(a_gridcoords, 0.0, 1.0);
+  gl_Position = toClipcoords * a_gridcoords;
   gl_PointSize = 1.0;
   
   ivec2 here = ivec2(a_gridcoords);
-  float u_x = texelFetch(velocityX, here, 0).x;
-  float u_y = texelFetch(velocityY, here, 0).x;
+  float u_x = texture(velocityX, (toVelocityXTexcoords * a_gridcoords).xy).x;
+  float u_y = texture(velocityY, (toVelocityYTexcoords * a_gridcoords).xy).x;
   
-  vec2 there = a_gridcoords - (dt * vec2(u_x, u_y));
-  q = texture(scalarField, (toScalarTexcoords * vec4(there, 0.0, 1.0)).xy).x;
+  vec2 there = a_gridcoords.xy - (dt * vec2(u_x, u_y));
+  int water_there = texture(waterMask, there).x;
+  if (water_there == 0) {
+    q = 0.0;
+  } else {
+    q = float(water_there) * texture(scalarField, (toScalarTexcoords * vec4(there, 0.0, 1.0)).xy).x;
+  }
 }
 `;
 

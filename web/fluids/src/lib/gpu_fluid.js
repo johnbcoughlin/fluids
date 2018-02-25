@@ -54,7 +54,7 @@ export class GPUFluid {
 
   constructor(gl) {
     this.gl = gl;
-    const n = 200;
+    const n = 40;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -99,7 +99,7 @@ export class GPUFluid {
       for (let j = 0; j < this.ny; j++) {
         for (let i = 0; i < this.nx+1; i++) {
           if (i === this.nx / 2 && j === this.ny / 2) {
-            data.push(1.0);
+            data.push(0.4);
           } else {
             data.push(0.0);
           }
@@ -116,7 +116,7 @@ export class GPUFluid {
       for (let j = 0; j < this.ny+1; j++) {
         for (let i = 0; i < this.nx; i++) {
           if (i === this.nx / 2 && j === this.ny / 2) {
-            data.push(1.0);
+            data.push(0.4);
           } else {
             data.push(0.0);
           }
@@ -211,7 +211,7 @@ export class GPUFluid {
         this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
 
     this.advectionRender = new AdvectionRender(this.gl, this.nx, this.dx, this.ny, this.dy, this.dt,
-        this.velocityX, this.velocityY, this.dye);
+        this.velocityX, this.velocityY, this.dye, this.waterMask);
 
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,

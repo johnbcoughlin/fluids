@@ -1,6 +1,9 @@
 // @flow
 
-import {createProgram, loadShader, renderToCanvas} from "../gl_util";
+import {
+  createProgram, loadShader, renderToBottomLeft, renderToBottomRight, renderToCanvas, renderToTopLeft,
+  renderToTopRight
+} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
@@ -18,12 +21,15 @@ export class CanvasRender {
   multigrid;
   residualsMultigrid;
   dye;
+  corrections;
+  correctionsMultigrid;
 
   program;
   vao;
   solidDistanceLocation;
   airDistanceLocation;
   uniformTextureLocation;
+  normalizerLocation;
 
   constructor(gl: any,
               nx: num,
@@ -36,7 +42,9 @@ export class CanvasRender {
               residuals: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,
-              dye: TwoPhaseRenderTarget) {
+              dye: TwoPhaseRenderTarget,
+              corrections: TwoPhaseRenderTarget,
+              correctionsMultigrid: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -49,6 +57,8 @@ export class CanvasRender {
     this.multigrid = multigrid;
     this.residualsMultigrid = residualsMultigrid;
     this.dye = dye;
+    this.corrections = corrections;
+    this.correctionsMultigrid = correctionsMultigrid;
     this.initialize(gl);
   }
 
@@ -67,6 +77,7 @@ export class CanvasRender {
     this.uniformTextureLocation = gl.getUniformLocation(this.program, "u_texture");
     this.airDistanceLocation = gl.getUniformLocation(this.program, "airDistance");
     this.solidDistanceLocation = gl.getUniformLocation(this.program, "solidDistance");
+    this.normalizerLocation = gl.getUniformLocation(this.program, "normalizer");
 
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toGridClipcoords"),
@@ -100,22 +111,42 @@ export class CanvasRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityY.renderFromA(this.uniformTextureLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
-    this.solidDistance.renderFromA(this.solidDistanceLocation);
-    renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
+    renderToCanvas(this.gl);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+    renderToTopLeft(this.gl);
+    this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
+    this.pressure.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+    renderToTopRight(this.gl);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
+    this.residuals.useAsTexture(this.uniformTextureLocation);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+    renderToBottomLeft(this.gl);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
+    this.multigrid.useAsTexture(this.uniformTextureLocation);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+    renderToBottomRight(this.gl);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
+    this.residualsMultigrid.useAsTexture(this.uniformTextureLocation);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+
     this.gl.bindVertexArray(null);
   }
 
   render2() {
     this.gl.useProgram(this.program);
-    this.residuals.renderFromA(this.uniformTextureLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
-    this.solidDistance.renderFromA(this.solidDistanceLocation);
+    this.residuals.useAsTexture(this.uniformTextureLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
     renderToCanvas(this.gl);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
@@ -150,6 +181,8 @@ uniform sampler2D u_texture;
 uniform mediump sampler2D airDistance;
 uniform mediump sampler2D solidDistance;
 
+uniform float normalizer;
+
 void main() {
   vec4 texcoords = toGridTexcoords * v_gridcoords;
   ivec2 here = ivec2(v_gridcoords.xy);
@@ -158,14 +191,20 @@ void main() {
   bool air = max4(texelFetch(airDistance, here, 0)) == 0.0;
   bool water = !solid && !air;
 
-  float p = texelFetch(u_texture, here, 0).x;
+  float p = texelFetch(u_texture, here, 0).x * normalizer;
   
-  if (!water && !air) {
-    outColor = vec4(0.2, 0.2, 0.2, 1.0);
-  } else if (air) {
-    outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  // if (!water && !air) {
+  //   outColor = vec4(0.2, 0.2, 0.2, 1.0);
+  // } else if (air) {
+  //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  // } else {
+  if (p > 0.0) {
+    outColor = vec4(0.0, 0.0, p, 1.0);
+  } else if (p != 0.0) {
+    outColor = vec4(abs(p), 0.0, 0.0, 1.0);
   } else {
-    outColor = vec4(p, 0.0, 0.0, 1.0);
-  }
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+  } 
+  // }
 }
 `;

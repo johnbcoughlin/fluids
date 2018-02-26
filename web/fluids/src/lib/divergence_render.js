@@ -9,12 +9,12 @@ export class DivergenceRender {
   dx;
   ny;
   dy;
-  divergence;
-  velocityX;
-  velocityY;
-  waterMask;
-  solidDistance;
-  airDistance;
+  divergence: TwoPhaseRenderTarget;
+  velocityX: TwoPhaseRenderTarget;
+  velocityY: TwoPhaseRenderTarget;
+  waterMask: TwoPhaseRenderTarget;
+  solidDistance: TwoPhaseRenderTarget;
+  airDistance: TwoPhaseRenderTarget;
 
   program;
   vao;
@@ -91,17 +91,18 @@ export class DivergenceRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityX.renderFromB(this.uniformVelocityXTextureLocation);
-    this.velocityY.renderFromB(this.uniformVelocityYTextureLocation);
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.solidDistance.renderFromA(this.solidDistanceLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
-    this.divergence.renderToA();
+    this.velocityX.useAsTexture(this.uniformVelocityXTextureLocation);
+    this.velocityY.useAsTexture(this.uniformVelocityYTextureLocation);
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    this.divergence.renderTo();
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.gridcoords.length / 2);
     this.gl.bindVertexArray(null);
+    this.divergence.swap();
   }
 }
 

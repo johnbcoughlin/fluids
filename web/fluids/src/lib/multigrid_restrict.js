@@ -1,6 +1,7 @@
 // @flow
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords} from "./grids";
+import {flatten} from "./utils";
 
 export class MultigridRestrictionRender {
   gl;
@@ -8,19 +9,23 @@ export class MultigridRestrictionRender {
   ny;
   residuals;
   residualsMultigrid;
+  waterMask;
 
   program;
   vaos;
   coords;
 
   sourceLocation;
+  waterMaskLocation;
+  destinationLevelLocation;
 
-  constructor(gl, nx, ny, residuals, residualsMultigrid) {
+  constructor(gl, nx, ny, residuals, residualsMultigrid, waterMask) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
     this.residuals = residuals;
     this.residualsMultigrid = residualsMultigrid;
+    this.waterMask = waterMask;
 
     this.initialize(gl);
   }
@@ -31,6 +36,8 @@ export class MultigridRestrictionRender {
     this.program = createProgram(gl, vertexShader, fragmentShader);
     gl.useProgram(this.program);
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
+    this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
+    this.destinationLevelLocation = gl.getUniformLocation(this.program, "destinationLevel");
 
     this.setupPositions(gl, this.program);
     gl.uniformMatrix4fv(
@@ -57,17 +64,17 @@ export class MultigridRestrictionRender {
             i + offset, j + offset,
           ];
           vertexCoords.push(
-            // the coordinates of the target of the restriction
-            // the coordinates of the source grid points which contribute to the target
-            2 * i - 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
-            2 * i - 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
-            2 * i - 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16,
-            2 * i + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 8,
-            2 * i + sourceOffset, 2 * j + sourceOffset, 1.0 / 4,
-            2 * i + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 8,
-            2 * i + 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
-            2 * i + 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
-            2 * i + 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16
+              // the coordinates of the target of the restriction
+              // the coordinates of the source grid points which contribute to the target
+              2 * i - 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
+              2 * i - 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
+              2 * i - 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16,
+              2 * i + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 8,
+              2 * i + sourceOffset, 2 * j + sourceOffset, 1.0 / 4,
+              2 * i + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 8,
+              2 * i + 1 + sourceOffset, 2 * j - 1 + sourceOffset, 1.0 / 16,
+              2 * i + 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
+              2 * i + 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16
           );
           levelCoords.push(vertexCoords);
         }
@@ -79,7 +86,7 @@ export class MultigridRestrictionRender {
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      const data = [].concat(...levelCoords);
+      const data = flatten(levelCoords);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 
       const afterGridcoordLocation = gl.getAttribLocation(program, "afterGridcoords");
@@ -139,16 +146,21 @@ export class MultigridRestrictionRender {
   restrictFrom(level) {
     this.gl.useProgram(this.program);
 
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.gl.uniform1i(this.destinationLevelLocation, level + 1);
+
     if (level === 0) {
-      this.residuals.renderFromB(this.sourceLocation);
-      this.residualsMultigrid.renderToA();
+      this.residuals.useAsTexture(this.sourceLocation);
+      this.residualsMultigrid.renderTo();
     } else {
-      this.residualsMultigrid.renderFromB(this.sourceLocation);
-      this.residualsMultigrid.renderToA();
+      this.residualsMultigrid.useAsTexture(this.sourceLocation);
+      this.residualsMultigrid.renderTo();
     }
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
+
+    this.residualsMultigrid.swap();
   }
 }
 
@@ -166,6 +178,9 @@ in vec4 contributor7;
 in vec4 contributor8;
 in vec4 contributor9;
 
+uniform mediump isampler2D waterMask;
+uniform int destinationLevel;
+
 // we have to convert the afterGridcoords to clip space
 uniform mat4 afterGridToClipcoords;
 
@@ -177,6 +192,13 @@ out float value;
 void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
+  
+  ivec2 here = ivec2(afterGridcoords.xy * float(1 << destinationLevel));
+  bool water_here = texelFetch(waterMask, here, 0).x == 1;
+  if (!water_here) {
+    value = 0.0;
+    return;
+  }
   
   float foo = 
       texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +

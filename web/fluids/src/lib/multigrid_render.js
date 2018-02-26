@@ -2,6 +2,7 @@
 import {gridPointVertices} from "./grids";
 import {createProgram, loadShader} from "../gl_util";
 import type {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import {flatten} from "./utils";
 
 export class MultigridRender {
   gl: any;
@@ -97,7 +98,7 @@ export class MultigridRender {
       const buffer = gl.createBuffer();
       gl.bindVertexArray(this.vaos[level]);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([].concat(...this.coords[level])), gl.STATIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(this.coords[level])), gl.STATIC_DRAW);
       this.bindCoordinateArrays(gl, this.program);
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
       gl.bindVertexArray(null);

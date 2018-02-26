@@ -1,9 +1,6 @@
 import React, {Component} from 'react';
 import logo from './logo.svg';
 import './App.css';
-import {loadShader} from "./gl_util.js";
-import {resizeCanvasToDisplaySize, checkFramebuffer, createProgram, renderToCanvas} from "./gl_util";
-import {TwoPhaseRenderTarget} from "./lib/two_phase_render_target";
 import {GPUFluid} from "./lib/gpu_fluid";
 
 class App extends Component {

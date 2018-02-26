@@ -43,6 +43,26 @@ export const renderToCanvas = (gl) => {
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 };
 
+export const renderToTopLeft = (gl) => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, gl.canvas.height / 2, gl.canvas.width / 2, gl.canvas.height / 2);
+};
+
+export const renderToTopRight = (gl) => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(gl.canvas.width / 2, gl.canvas.height / 2, gl.canvas.width / 2, gl.canvas.height / 2);
+};
+
+export const renderToBottomLeft = (gl) => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, gl.canvas.width / 2, gl.canvas.height / 2);
+};
+
+export const renderToBottomRight = (gl) => {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(gl.canvas.width / 2, 0, gl.canvas.width / 2, gl.canvas.height / 2);
+};
+
 export const checkFramebuffer = (gl) => {
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
   switch (status) {

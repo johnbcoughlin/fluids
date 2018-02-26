@@ -82,14 +82,15 @@ export class BodyForcesRender {
 
   render() {
     this.gl.useProgram(this.program);
-    this.solidDistance.renderFromA(this.solidDistanceLocation);
-    this.velocityY.renderFromA(this.uniformTextureLocation);
-    this.velocityY.renderToB();
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
+    this.velocityY.useAsTexture(this.uniformTextureLocation);
+    this.velocityY.renderTo();
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
+    this.velocityY.swap();
   }
 }
 

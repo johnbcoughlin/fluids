@@ -88,10 +88,10 @@ export class ApplyPressureCorrectionX {
 
   render() {
     this.gl.useProgram(this.program);
-    this.velocityX.renderFromB(this.velocityXLocation);
-    this.velocityX.renderToA();
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.pressure.renderFromA(this.pressureLocation);
+    this.velocityX.useAsTexture(this.velocityXLocation);
+    this.velocityX.renderTo();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.pressure.useAsTexture(this.pressureLocation);
     this.gl.bindVertexArray(this.vao);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);

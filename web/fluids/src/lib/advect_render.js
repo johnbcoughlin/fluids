@@ -121,11 +121,11 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toVelocityXTexcoords(this.nx, this.ny));
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.velocityX.renderFromB(this.velocityXLocation);
-    this.velocityX.renderFromB(this.scalarFieldLocation);
-    this.velocityY.renderFromB(this.velocityYLocation);
-    this.velocityX.renderToA();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.velocityX.useAsTexture(this.velocityXLocation);
+    this.velocityX.useAsTexture(this.scalarFieldLocation);
+    this.velocityY.useAsTexture(this.velocityYLocation);
+    this.velocityX.renderTo();
     this.gl.bindVertexArray(this.velocityXVAO);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -143,17 +143,17 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toVelocityYTexcoords(this.nx, this.ny));
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.velocityX.renderFromB(this.velocityXLocation);
-    this.velocityY.renderFromB(this.velocityYLocation);
-    this.velocityY.renderFromB(this.scalarFieldLocation);
-    this.velocityY.renderToA();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.velocityX.useAsTexture(this.velocityXLocation);
+    this.velocityY.useAsTexture(this.velocityYLocation);
+    this.velocityY.useAsTexture(this.scalarFieldLocation);
+    this.velocityY.renderTo();
     this.gl.bindVertexArray(this.velocityYVAO);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
-    // this.velocityY.swap();
+    this.velocityY.swap();
   }
 
   advectDye() {
@@ -165,11 +165,11 @@ export class AdvectionRender {
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "toScalarTexcoords"),
         false, toGridTexcoords(this.nx, this.ny));
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.velocityX.renderFromB(this.velocityXLocation);
-    this.velocityY.renderFromB(this.velocityYLocation);
-    this.dye.renderFromB(this.scalarFieldLocation);
-    this.dye.renderToA();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.velocityX.useAsTexture(this.velocityXLocation);
+    this.velocityY.useAsTexture(this.velocityYLocation);
+    this.dye.useAsTexture(this.scalarFieldLocation);
+    this.dye.renderTo();
     this.gl.bindVertexArray(this.dyeVAO);
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -204,7 +204,7 @@ void main() {
   float u_y = texture(velocityY, (toVelocityYTexcoords * a_gridcoords).xy).x;
   
   vec2 there = a_gridcoords.xy - (dt * vec2(u_x, u_y));
-  int water_there = texture(waterMask, there).x;
+  int water_there = texelFetch(waterMask, ivec2(there), 0).x;
   if (water_there == 0) {
     q = 0.0;
   } else {

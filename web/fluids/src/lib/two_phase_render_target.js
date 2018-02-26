@@ -15,6 +15,11 @@ export class TwoPhaseRenderTarget {
   framebufferB = null;
   textureB = null;
 
+  swapped: boolean = true;
+
+  currentRenderTarget: string = "B";
+  usableTexture: string = "A";
+
   constructor(gl, name: string, textureUnit, textureUnitInt, textureFactory, width, height) {
     this.gl = gl;
     this.name = name;
@@ -48,35 +53,34 @@ export class TwoPhaseRenderTarget {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  renderFromA(uniformLocation) {
+  useAsTexture(uniformLocation) {
+    if (!this.swapped) {
+      throw new Error("render target cannot be used before being swapped");
+    }
     this.gl.activeTexture(this.textureUnit);
     this.gl.uniform1i(uniformLocation, this.textureUnitInt);
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureA);
+    if (this.usableTexture === "A") {
+      this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureA);
+    } else {
+      this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureB);
+    }
   }
 
-  renderFromB(uniformLocation) {
-    this.gl.activeTexture(this.textureUnit);
-    this.gl.uniform1i(uniformLocation, this.textureUnitInt);
-    this.gl.bindTexture(this.gl.TEXTURE_2D, this.textureB);
-  }
-
-  renderToA() {
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebufferA);
+  renderTo() {
+    this.swapped = false;
     this.gl.viewport(0, 0, this.width, this.height);
+    if (this.currentRenderTarget === "A") {
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebufferA);
+    } else {
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebufferB);
+    }
   }
 
-  renderToB() {
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebufferB);
-    this.gl.viewport(0, 0, this.width, this.height);
-  }
 
   swap() {
-    let tmpFb = this.framebufferA;
-    let tmpTex = this.textureA;
-    this.framebufferA = this.framebufferB;
-    this.textureA = this.textureB;
-    this.framebufferB = tmpFb;
-    this.textureB = tmpTex;
+    this.swapped = true;
+    this.currentRenderTarget = this.currentRenderTarget === "A" ? "B" : "A";
+    this.usableTexture = this.usableTexture === "A" ? "B" : "A";
   }
 }
 

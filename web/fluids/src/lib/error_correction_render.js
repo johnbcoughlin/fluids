@@ -91,7 +91,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
 
     } else {
       gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * 2);
-      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
+      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * 2);
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
@@ -105,25 +105,27 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   }
 
   renderAToB(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
-    residuals.renderFromA(this.residualsLocation);
-    solution.renderFromA(this.solutionLocation);
-    solution.renderToB();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    residuals.useAsTexture(this.residualsLocation);
+    solution.useAsTexture(this.solutionLocation);
+    solution.renderTo();
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
+    solution.swap();
   }
 
   renderBToA(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
-    residuals.renderFromA(this.residualsLocation);
-    solution.renderFromB(this.solutionLocation);
-    solution.renderToA();
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    residuals.useAsTexture(this.residualsLocation);
+    solution.useAsTexture(this.solutionLocation);
+    solution.renderTo();
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
+    solution.swap();
   }
 }
 
@@ -175,17 +177,21 @@ void main() {
   float solution_up = texelFetch(solution, ihere + ivec2(0, 1), 0).x;
   float solution_down = texelFetch(solution, ihere + ivec2(0, -1), 0).x;
   
+  float solution_here = texelFetch(solution, ihere, 0).x;
   float residual_here = texelFetch(residuals, ihere, 0).x;
   
   float norm = dt / (dx * dx);
   float d = float(water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down) * norm;
   
-  new_solution = (1.0 / d) * (residual_here +
+  float z = (1.0 / d) * (residual_here +
       (float(water_left) * solution_left + 
       float(water_right) * solution_right +
       float(water_up) * solution_up + 
       float(water_down) * solution_down) * norm);
+      
+  float omega = 0.8;
+  new_solution = solution_here + omega * (z - solution_here);
 }
 `;
 

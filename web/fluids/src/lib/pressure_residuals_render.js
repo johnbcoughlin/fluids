@@ -4,8 +4,8 @@ import {MultigridRender} from "./multigrid_render";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
 export class ResidualsRender extends MultigridRender {
-  waterMask;
-  airDistance;
+  waterMask: TwoPhaseRenderTarget;
+  airDistance: TwoPhaseRenderTarget;
 
   waterMaskLocation;
   airDistanceLocation;
@@ -65,26 +65,34 @@ export class ResidualsRender extends MultigridRender {
     const gl = this.gl;
     const program = this.program;
     this.gl.useProgram(this.program);
-    this.waterMask.renderFromA(this.waterMaskLocation);
-    this.airDistance.renderFromA(this.airDistanceLocation);
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
+    gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * Math.pow(2, level));
+    gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * Math.pow(2, level));
     if (level === 0) {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
-      this.residuals.renderFromA(this.residualsLocation);
-      this.pressure.renderFromA(this.solutionLocation);
-      this.residuals.renderToB();
+      this.residuals.useAsTexture(this.residualsLocation);
+      this.pressure.useAsTexture(this.solutionLocation);
+      this.residuals.renderTo();
     } else {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      this.residualsMultigrid.renderFromA(this.residualsLocation);
-      this.multigrid.renderFromA(this.solutionLocation);
-      this.residualsMultigrid.renderToB();
+      this.residualsMultigrid.useAsTexture(this.residualsLocation);
+      this.multigrid.useAsTexture(this.solutionLocation);
+      this.residualsMultigrid.renderTo();
     }
-    this.gl.bindVertexArray(this.vaos[0]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[0].length);
+    this.gl.bindVertexArray(this.vaos[level]);
+    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
+
+    if (level === 0) {
+      this.residuals.swap();
+    } else {
+      this.residualsMultigrid.swap();
+    }
   }
 }
 
@@ -119,10 +127,10 @@ void main() {
   int water_right = bitmask_right(waterMask, here) ? 1 : 0;
   int water_down = bitmask_down(waterMask, here) ? 1 : 0;
   int water_up = bitmask_up(waterMask, here) ? 1 : 0;
-  int air_left = texelFetch(airDistance, here, 0).x < 0.5 ? 1 : 0;
-  int air_right = texelFetch(airDistance, here, 0).y < 0.5 ? 1 : 0;
-  int air_down = texelFetch(airDistance, here, 0).z < 0.5 ? 1 : 0;
-  int air_up = texelFetch(airDistance, here, 0).w < 0.5 ? 1 : 0;
+  int air_left = texelFetch(airDistance, here, 0).x < 1.0 ? 1 : 0;
+  int air_right = texelFetch(airDistance, here, 0).y < 1.0 ? 1 : 0;
+  int air_down = texelFetch(airDistance, here, 0).z < 1.0 ? 1 : 0;
+  int air_up = texelFetch(airDistance, here, 0).w < 1.0 ? 1 : 0;
   
   here = ivec2(a_gridcoords);
   float solution_left = texelFetch(solution, left(here), 0).x;

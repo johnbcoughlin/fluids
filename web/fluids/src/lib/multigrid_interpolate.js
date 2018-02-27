@@ -17,9 +17,12 @@ export class MultigridInterpolatePressure {
   program;
   vaos;
   coords;
+  offsets;
 
   sourceLocation;
   waterMaskLocation;
+  destinationLevelLocation;
+  offsetLocation;
 
   constructor(gl, nx, ny, multigrid, corrections, correctionsMultigrid, waterMask) {
     this.gl = gl;
@@ -40,6 +43,7 @@ export class MultigridInterpolatePressure {
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
     this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.destinationLevelLocation = gl.getUniformLocation(this.program, "destinationLevel");
+    this.offsetLocation = gl.getUniformLocation(this.program, "offset");
 
     this.setupPositions(gl, this.program);
   }
@@ -51,15 +55,16 @@ export class MultigridInterpolatePressure {
     let offset = 0;
     this.coords = [];
     this.vaos = [];
+    this.offsets = [offset];
 
     while (targetLevelNx > 2 && targetLevelNy > 2) {
       const levelCoords = [];
+      if (targetLevel > 1) {
+        offset += Math.max(Math.floor(targetLevelNx * 2), Math.floor(targetLevelNy * 2)) + 1;
+      }
       for (let i = 0; i < targetLevelNx; i++) {
         for (let j = 0; j < targetLevelNy; j++) {
           const vertex = [i + offset, j + offset];
-          if (targetLevel > 0) {
-            offset += Math.max(Math.floor(targetLevelNx / 2), Math.floor(targetLevelNy / 2)) + 1;
-          }
           if (i % 2 === 0 && j % 2 === 0) {
             vertex.push(
                 i / 2 + offset, j / 2, 1,
@@ -90,6 +95,7 @@ export class MultigridInterpolatePressure {
       }
 
       this.coords[targetLevel] = levelCoords;
+      this.offsets[targetLevel] = offset;
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -138,6 +144,7 @@ export class MultigridInterpolatePressure {
     this.gl.useProgram(this.program);
     // prepare to use the vertices referring to coordinates in the target level
     this.gl.uniform1i(this.destinationLevelLocation, level);
+    this.gl.uniform1i(this.offsetLocation, this.offsets[level]);
 
     this.multigrid.useAsTexture(this.sourceLocation);
     if (level === 0) {
@@ -151,9 +158,6 @@ export class MultigridInterpolatePressure {
           this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
     }
-
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
@@ -179,6 +183,7 @@ in vec4 contributor4;
 uniform mat4 afterGridToClipcoords;
 uniform mediump isampler2D waterMask;
 uniform int destinationLevel;
+uniform int offset;
 
 uniform sampler2D source;
 
@@ -188,7 +193,7 @@ void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
   
-  ivec2 here = ivec2(afterGridcoords.xy * float(1 << destinationLevel));
+  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
   bool water_here = texelFetch(waterMask, here, 0).x == 1;
   if (!water_here) {
     value = 0.0;

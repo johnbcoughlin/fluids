@@ -15,10 +15,12 @@ export class MultigridRestrictionRender {
   program;
   vaos;
   coords;
+  offsets;
 
   sourceLocation;
   waterMaskLocation;
   destinationLevelLocation;
+  offsetLocation;
 
   constructor(gl, nx, ny, residuals, residualsMultigrid, rightHandSideMultigrid, waterMask) {
     this.gl = gl;
@@ -40,11 +42,12 @@ export class MultigridRestrictionRender {
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
     this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.destinationLevelLocation = gl.getUniformLocation(this.program, "destinationLevel");
+    this.offsetLocation = gl.getUniformLocation(this.program, "offset");
 
     this.setupPositions(gl, this.program);
     gl.uniformMatrix4fv(
         gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-        false, toGridClipcoords(this.residualsMultigrid.width, this.residualsMultigrid.height));
+        false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
   }
 
   setupPositions(gl, program) {
@@ -55,6 +58,7 @@ export class MultigridRestrictionRender {
     let sourceOffset = 0;
     this.coords = [];
     this.vaos = [];
+    this.offsets = [];
 
     while (sourceLevelNx > 2 && sourceLevelNy > 2) {
       const levelCoords = [];
@@ -78,10 +82,12 @@ export class MultigridRestrictionRender {
               2 * i + 1 + sourceOffset, 2 * j + sourceOffset, 1.0 / 8,
               2 * i + 1 + sourceOffset, 2 * j + 1 + sourceOffset, 1.0 / 16
           );
-          levelCoords.push(vertexCoords);
+          const clamped = vertexCoords.map((c) => Math.max(0, Math.min(c, this.rightHandSideMultigrid.height)));
+          levelCoords.push(clamped);
         }
       }
       this.coords[sourceLevel] = levelCoords;
+      this.offsets[sourceLevel] = offset;
 
       const vao = gl.createVertexArray();
       gl.bindVertexArray(vao);
@@ -150,9 +156,16 @@ export class MultigridRestrictionRender {
 
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.gl.uniform1i(this.destinationLevelLocation, level + 1);
+    this.gl.uniform1i(this.offsetLocation, this.offsets[level]);
+    this.gl.uniformMatrix4fv(
+        this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
+        false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
 
     if (level === 0) {
       this.residuals.useAsTexture(this.sourceLocation);
+      console.log(this.coords[0]);
+      console.log(this.offsets[0]);
+      console.log(this.vaos);
     } else {
       this.residualsMultigrid.useAsTexture(this.sourceLocation);
     }
@@ -181,6 +194,7 @@ in vec4 contributor9;
 
 uniform mediump isampler2D waterMask;
 uniform int destinationLevel;
+uniform int offset;
 
 // we have to convert the afterGridcoords to clip space
 uniform mat4 afterGridToClipcoords;
@@ -194,24 +208,34 @@ void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
   
-  ivec2 here = ivec2(afterGridcoords.xy * float(1 << destinationLevel));
-  bool water_here = texelFetch(waterMask, here, 0).x == 1;
-  if (!water_here) {
-    value = 0.0;
-    return;
-  }
-  
-  float foo = 
-      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
-      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
-      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
-      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
-      texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
-      texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
-      texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
-      texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
-      texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
-  value = foo;
+  // ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
+  // bool water_here = texelFetch(waterMask, here, 0).x == 1;
+  // if (!water_here) {
+  //   value = 0.0;
+  //   return;
+  // }
+  //
+  // float foo = 
+  //     texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
+  //     texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
+  //     texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
+  //     texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
+  //     texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
+  //     texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
+  //     texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
+  //     texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
+  //     texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
+  value = 1.0;
+  vec4 bar = contributor1 + 
+  contributor2 +
+  contributor3 +
+  contributor4 +
+  contributor5 +
+  contributor6 +
+  contributor7 +
+  contributor8 +
+  contributor9;
+  value = bar.x;
 }
 `;
 
@@ -223,6 +247,6 @@ in float value;
 out float Value;
 
 void main() {
-  Value = value;
+  Value = 1.0;
 }
 `;

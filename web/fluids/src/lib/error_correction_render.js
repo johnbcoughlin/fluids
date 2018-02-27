@@ -10,6 +10,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   waterMask;
   airDistance;
   solidDistance;
+  rightHandSideMultigrid;
 
   waterMaskLocation;
   airDistanceLocation;
@@ -29,7 +30,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               pressure: TwoPhaseRenderTarget,
               divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
-              residualsMultigrid: TwoPhaseRenderTarget) {
+              residualsMultigrid: TwoPhaseRenderTarget,
+              rightHandSideMultigrid: TwoPhaseRenderTarget) {
     super(gl, nx, ny, pressure, divergence, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
     this.dy = dy;
@@ -37,6 +39,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.waterMask = waterMask;
     this.airDistance = airDistance;
     this.solidDistance = solidDistance;
+    this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
   }
 
@@ -83,7 +86,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      this.renderAToB(level, this.multigrid, this.residualsMultigrid);
+      this.renderAToB(level, this.multigrid, this.rightHandSideMultigrid);
     }
   }
 

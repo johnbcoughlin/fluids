@@ -24,6 +24,7 @@ export class CanvasRender {
   corrections;
   correctionsMultigrid;
   divergence;
+  rightHandSideMultigrid;
 
   program;
   vao;
@@ -46,7 +47,8 @@ export class CanvasRender {
               dye: TwoPhaseRenderTarget,
               corrections: TwoPhaseRenderTarget,
               correctionsMultigrid: TwoPhaseRenderTarget,
-              divergence: TwoPhaseRenderTarget) {
+              divergence: TwoPhaseRenderTarget,
+              rightHandSideMultigrid: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -62,6 +64,7 @@ export class CanvasRender {
     this.corrections = corrections;
     this.correctionsMultigrid = correctionsMultigrid;
     this.divergence = divergence;
+    this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
   }
 
@@ -127,18 +130,24 @@ export class CanvasRender {
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToTopRight(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
-    this.velocityX.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 10.0);
+    this.residuals.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
-    this.velocityY.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 100.0);
+    this.gl.uniformMatrix4fv(
+        this.gl.getUniformLocation(this.program, "toGridTexcoords"),
+        false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
+    this.multigrid.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomRight(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 100.0);
-    this.multigrid.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniformMatrix4fv(
+        this.gl.getUniformLocation(this.program, "toGridTexcoords"),
+        false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
+    this.rightHandSideMultigrid.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 

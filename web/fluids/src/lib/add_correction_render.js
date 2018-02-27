@@ -1,5 +1,5 @@
 // @flow
-import {toGridClipcoords, toGridTexcoords} from "./grids";
+import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
 
 export class AddCorrectionRender extends MultigridRender {
@@ -41,9 +41,6 @@ export class AddCorrectionRender extends MultigridRender {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(this.program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(this.program, "toGridTexcoords"),
-          false, toGridTexcoords(this.nx, this.ny));
     } else {
       this.multigrid.useAsTexture(this.solutionLocation);
       this.correctionsMultigrid.useAsTexture(this.correctionLocation);
@@ -51,9 +48,6 @@ export class AddCorrectionRender extends MultigridRender {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(this.program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(this.program, "toGridTexcoords"),
-          false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
     }
     gl.bindVertexArray(this.vaos[level]);
     gl.drawArrays(gl.POINTS, 0, this.coords[level].length);
@@ -74,7 +68,6 @@ uniform sampler2D solution;
 uniform sampler2D correction;
 
 uniform mat4 toGridClipcoords;
-uniform mat4 toGridTexcoords;
 
 out float value;
 
@@ -82,9 +75,9 @@ void main() {
   gl_Position = toGridClipcoords * a_gridcoords;
   gl_PointSize = 1.0;
   
-  vec2 here = (toGridTexcoords * a_gridcoords).xy;
+  ivec2 here = ivec2(a_gridcoords.xy);
   
-  value = texture(solution, here).x + texture(correction, here).x;
+  value = texelFetch(solution, here, 0).x + texelFetch(correction, here, 0).x;
 }
 `;
 

@@ -245,7 +245,7 @@ export class GPUFluid {
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airDistance, this.solidDistance,
-        this.pressure, this.divergence, this.multigrid, this.rightHandSideMultigrid);
+        this.pressure, this.divergence, this.multigrid, this.residualsMultigrid, this.rightHandSideMultigrid);
 
     this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny,
         this.pressure, this.corrections,
@@ -262,7 +262,7 @@ export class GPUFluid {
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,
         this.pressure, this.residuals, this.multigrid, this.residualsMultigrid,
-        this.dye, this.corrections, this.correctionsMultigrid, this.divergence);
+        this.dye, this.corrections, this.correctionsMultigrid, this.divergence, this.rightHandSideMultigrid);
   }
 
   render() {
@@ -281,11 +281,12 @@ export class GPUFluid {
     this.canvasRender.render();
 
     this.advectionRender.advectDye();
-    requestAnimationFrame(() => this.render());
+    // requestAnimationFrame(() => this.render());
+    // setTimeout(() => this.render(), 100);
   }
 
   solvePressure() {
-    for (let i = 0; i < 51; i++) {
+    for (let i = 0; i < 3; i++) {
       // level 1
       this.errorCorrectionJacobiRender.render(0);
       this.errorCorrectionJacobiRender.render(0);
@@ -301,26 +302,26 @@ export class GPUFluid {
       this.errorCorrectionJacobiRender.render(2);
 
       // level 3
-      // this.pressureResidualsRender.render(2);
-      // this.restrictResidualsRender.restrictFrom(2);
-      // this.errorCorrectionJacobiRender.render(3);
-      // this.errorCorrectionJacobiRender.render(3);
+      this.pressureResidualsRender.render(2);
+      this.restrictResidualsRender.restrictFrom(2);
+      this.errorCorrectionJacobiRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
 
       // level 4
-      // this.pressureResidualsRender.render(3);
-      // this.restrictResidualsRender.restrictFrom(3);
-      // for (let i = 0; i < 10; i++) {
-      //   this.errorCorrectionJacobiRender.render(4);
-      //   this.errorCorrectionJacobiRender.render(4);
-      // }
-      //
-      // this.interpolatePressureRender.interpolateTo(3);
-      // this.addCorrectionRender.render(3);
-      // this.errorCorrectionJacobiRender.render(3);
-      //
-      // this.interpolatePressureRender.interpolateTo(2);
-      // this.addCorrectionRender.render(2);
-      // this.errorCorrectionJacobiRender.render(2);
+      this.pressureResidualsRender.render(3);
+      this.restrictResidualsRender.restrictFrom(3);
+      for (let i = 0; i < 10; i++) {
+        this.errorCorrectionJacobiRender.render(4);
+        this.errorCorrectionJacobiRender.render(4);
+      }
+
+      this.interpolatePressureRender.interpolateTo(3);
+      this.addCorrectionRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
+
+      this.interpolatePressureRender.interpolateTo(2);
+      this.addCorrectionRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
 
       this.interpolatePressureRender.interpolateTo(1);
       this.addCorrectionRender.render(1);

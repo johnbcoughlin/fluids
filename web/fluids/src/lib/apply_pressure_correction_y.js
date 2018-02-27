@@ -3,32 +3,34 @@
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 import {createProgram, loadShader} from "../gl_util";
 import {toVelocityYClipcoords} from "./grids";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {FinestGrid, Pressure, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
 
 export class ApplyPressureCorrectionY {
-  gl;
-  nx;
-  dx;
-  ny;
-  dy;
-  dt;
-  pressure;
-  velocityX;
-  velocityY;
-  waterMask;
+  gl: GL;
+  nx: number;
+  dx: number;
+  ny: number;
+  dy: number;
+  dt: number;
+  pressure: Pressure;
+  velocityX: StaggerXGrid;
+  velocityY: StaggerYGrid;
+  waterMask: WaterMask;
 
-  program;
-  vao;
-  positions;
-  velocityYLocation;
-  waterMaskLocation;
-  pressureLocation;
+  program: GLProgram;
+  vao: GLVAO;
+  positions: Array<Array<number>>;
+  velocityYLocation: GLLocation;
+  waterMaskLocation: GLLocation;
+  pressureLocation: GLLocation;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
-              dt: num,
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
+              dt: number,
               pressure: TwoPhaseRenderTarget,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,

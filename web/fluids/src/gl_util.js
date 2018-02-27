@@ -2,7 +2,9 @@
 // creates a shader of the given type, uploads the source and
 // compiles it.
 //
-export const loadShader = (gl, type, source) => {
+import type {GL, GLProgram, GLShader} from "./lib/types";
+
+export const loadShader = (gl, type, source): GLShader => {
   const shader = gl.createShader(type);
 
   // Send the source to the shader object
@@ -24,7 +26,7 @@ export const loadShader = (gl, type, source) => {
   return shader;
 };
 
-export const createProgram = (gl, vertexShader, fragmentShader) => {
+export const createProgram = (gl: GL, vertexShader: GLShader, fragmentShader: GLShader): GLProgram => {
   const program = gl.createProgram();
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);

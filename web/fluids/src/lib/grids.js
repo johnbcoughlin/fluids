@@ -1,5 +1,5 @@
 // @flow
-export const toGridClipcoords = (nx, ny) => {
+export const toGridClipcoords = (nx: number, ny: number): Array<number> => {
   return [
     2 / nx, 0, 0, 0,
     0, 2 / ny, 0, 0,
@@ -8,7 +8,7 @@ export const toGridClipcoords = (nx, ny) => {
   ];
 };
 
-export const toGridTexcoords = (nx, ny) => {
+export const toGridTexcoords = (nx: number, ny: number): Array<number> => {
   return [
     1 / nx, 0, 0, 0,
     0, 1 / ny, 0, 0,
@@ -17,7 +17,7 @@ export const toGridTexcoords = (nx, ny) => {
   ];
 };
 
-export const toGridTexcoordsWithOffset = (nx, ny, offset) => {
+export const toGridTexcoordsWithOffset = (nx: number, ny: number, offset: number): Array<number> => {
   return [
     1 / nx, 0, 0, 0,
     0, 1 / ny, 0, 0,
@@ -26,23 +26,23 @@ export const toGridTexcoordsWithOffset = (nx, ny, offset) => {
   ]
 };
 
-export const toVelocityXClipcoords = (nx, ny) => {
+export const toVelocityXClipcoords = (nx: number, ny: number): Array<number> => {
   return toGridClipcoords(nx + 1, ny);
 };
 
-export const toVelocityXTexcoords = (nx, ny) => {
+export const toVelocityXTexcoords = (nx: number, ny: number): Array<number> => {
   return toGridTexcoords(nx + 1, ny);
 };
 
-export const toVelocityYClipcoords = (nx, ny) => {
+export const toVelocityYClipcoords = (nx: number, ny: number): Array<number> => {
   return toGridClipcoords(nx, ny + 1);
 };
 
-export const toVelocityYTexcoords = (nx, ny) => {
+export const toVelocityYTexcoords = (nx: number, ny: number): Array<number> => {
   return toGridTexcoords(nx, ny + 1);
 };
 
-export const gridTriangleStripVertices = (nx, ny) => {
+export const gridTriangleStripVertices = (nx: number, ny: number): Array<number> => {
   const positions = [];
   for (let i = 0; i < nx - 1; i++) {
     for (let j = 0; j < ny; j++) {
@@ -53,7 +53,7 @@ export const gridTriangleStripVertices = (nx, ny) => {
   return positions;
 };
 
-export const gridPointVertices = (nx, ny) => {
+export const gridPointVertices = (nx: number, ny: number): Array<Array<number>> => {
   const positions = [];
   for (let i = 0; i < nx; i++) {
     for (let j = 0; j < ny; j++) {
@@ -72,15 +72,15 @@ const solidBorderLeft = (nx) => {
   return Math.floor(nx / 4) - 0.5;
 };
 
-const solidBorderRight = (nx) => {
+const solidBorderRight = (nx: number): number => {
   return nx - Math.floor(nx / 4) - 0.5;
 };
 
-const solidBorderBottom = (ny) => {
+const solidBorderBottom = (ny: number): number => {
   return Math.floor(ny / 4) - 0.5;
 };
 
-export const waterMask = (nx, ny) => {
+export const waterMask = (nx: number, ny: number): Array<number> => {
   const result = [];
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
@@ -97,14 +97,14 @@ export const waterMask = (nx, ny) => {
   return result;
 };
 
-export const airDistances = (nx, ny) => {
+export const airDistances = (nx: number, ny: number): Array<number> => {
   const result = [];
   const borderLeft = solidBorderLeft(nx);
   const borderRight = solidBorderRight(nx);
   const borderBottom = airBorder(ny);
   const isWater = (i, j) => (i > borderLeft && i < borderRight && j > borderBottom);
 
-  const search = (applyOffset, i, j) => {
+  const search = (applyOffset, i: number, j: number) => {
     let upperBound = Math.max(nx, ny);
     let lowerBound = 0.0;
     if (!isWater(...applyOffset(i, j, upperBound))) {
@@ -143,7 +143,7 @@ export const airDistances = (nx, ny) => {
   return result;
 };
 
-export const solidDistances = (nx, ny) => {
+export const solidDistances = (nx: number, ny: number): Array<Array<number>> => {
   const result = [];
   const borderLeftEnd = solidBorderLeft(nx);
   const borderRightStart = solidBorderRight(nx);

@@ -2,28 +2,35 @@
 import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {Divergence, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution} from "./gpu_fluid";
+import type {GL, GLLocation, GLProgram} from "./types";
 
 export class ErrorCorrectionJacobiRender extends MultigridRender {
-  dx;
-  dy;
-  dt;
-  waterMask;
-  airDistance;
-  solidDistance;
-  rightHandSideMultigrid;
+  dx: number;
+  dy: number;
+  dt: number;
+  waterMask: FinestGrid;
+  airDistance: FinestGrid;
+  solidDistance: FinestGrid;
 
-  waterMaskLocation;
-  airDistanceLocation;
-  solidDistanceLocation;
-  solutionLocation;
-  residualsLocation;
+  pressure: Pressure;
+  divergence: Divergence;
+  multigrid: Solution & Multigrid;
+  residualsMultigrid: Residual & Multigrid;
+  rightHandSideMultigrid: RightHandSide & Multigrid;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
-              dt: num,
+  waterMaskLocation: GLLocation;
+  airDistanceLocation: GLLocation;
+  solidDistanceLocation: GLLocation;
+  solutionLocation: GLLocation;
+  residualsLocation: GLLocation;
+
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
+              dt: number,
               waterMask: TwoPhaseRenderTarget,
               airDistance: TwoPhaseRenderTarget,
               solidDistance: TwoPhaseRenderTarget,
@@ -32,18 +39,24 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,
               rightHandSideMultigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, pressure, divergence, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
     this.airDistance = airDistance;
     this.solidDistance = solidDistance;
+
+    this.pressure = pressure;
+    this.divergence = divergence;
+    this.multigrid = multigrid;
+    this.residualsMultigrid = residualsMultigrid;
+
     this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
   }
 
-  initializeUniforms(gl, program) {
+  initializeUniforms(gl: GL, program: GLProgram) {
     this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
     this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
     this.solidDistanceLocation = gl.getUniformLocation(program, "solidDistance");
@@ -53,14 +66,14 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
 
-  initializeLevel(level, levelNx, levelNy, offset) {
+  initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
   }
 
-  vertexAttributeValues(level, i, j, offset) {
+  vertexAttributeValues(level: number, i: number, j: number, offset: number) {
     return [i + offset, j + offset, i * Math.pow(2, level), j * Math.pow(2, level)];
   }
 
-  bindCoordinateArrays(gl, program) {
+  bindCoordinateArrays(gl: GL, program: GLProgram) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     gl.enableVertexAttribArray(gridcoordsLocation);
     gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 0);
@@ -69,7 +82,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     gl.vertexAttribPointer(finestGridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
   }
 
-  render(level) {
+  render(level: number) {
     const gl = this.gl;
     const program = this.program;
     gl.useProgram(program);
@@ -90,7 +103,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     }
   }
 
-  renderAToB(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
+  renderAToB(level: number, solution: Solution, residuals: Residual) {
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.airDistance.useAsTexture(this.airDistanceLocation);
     residuals.useAsTexture(this.residualsLocation);

@@ -14,32 +14,50 @@ import {ApplyPressureCorrectionY} from "./apply_pressure_correction_y";
 import {ApplyPressureCorrectionX} from "./apply_pressure_correction_x";
 import {AdvectionRender} from "./advect_render";
 import {flatten} from "./utils";
+import type {GL} from "./types";
+
+// grid types
+export type FinestGrid = TwoPhaseRenderTarget & FinestGrid;
+export type Multigrid = TwoPhaseRenderTarget & Multigrid;
+export type StaggerXGrid = TwoPhaseRenderTarget & StaggerXGrid;
+export type StaggerYGrid = TwoPhaseRenderTarget & StaggerYGrid;
+
+export type Solution = TwoPhaseRenderTarget & Solution;
+export type RightHandSide = TwoPhaseRenderTarget & RightHandSide;
+export type Residual = TwoPhaseRenderTarget & Residual;
+export type Correction = TwoPhaseRenderTarget & Correction;
+
+export type Pressure = Solution & FinestGrid;
+export type Divergence = RightHandSide & FinestGrid;
+export type WaterMask = TwoPhaseRenderTarget & WaterMask;
 
 export class GPUFluid {
   // WebGL2 Context
-  gl;
-  nx;
-  dx;
-  ny;
-  dy;
-  dt;
-  g;
+  gl: GL;
+  nx: number;
+  dx: number;
+  ny: number;
+  dy: number;
+  dt: number;
+  g: number;
 
   // masks and indicators
-  waterMask;
-  airDistance;
-  solidDistance;
+  waterMask: FinestGrid;
+  airDistance: FinestGrid;
+  solidDistance: FinestGrid;
 
   // render targets
-  velocityX;
-  velocityY;
-  residuals;
-  pressure;
-  multigrid;
-  residualsMultigrid;
-  dye;
-  corrections;
-  correctionsMultigrid;
+  velocityX: StaggerXGrid;
+  velocityY: StaggerYGrid;
+  residuals: Residual & FinestGrid;
+  pressure: Solution & FinestGrid;
+  multigrid: Solution & Multigrid;
+  residualsMultigrid: Residual;
+  divergence: Divergence;
+  rightHandSideMultigrid: RightHandSide & Multigrid;
+  dye: FinestGrid;
+  corrections: Correction & FinestGrid;
+  correctionsMultigrid: Correction & Multigrid;
 
   // render stages
   bodyForcesRender: BodyForcesRender;
@@ -66,7 +84,7 @@ export class GPUFluid {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     this.waterMask = new TwoPhaseRenderTarget(gl, "water", gl.TEXTURE0, 0, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, this.nx, this.ny, 0, gl.RED_INTEGER, gl.INT,
           new Int32Array(waterMask(this.nx, this.ny)));

@@ -3,36 +3,38 @@
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 import {createProgram, loadShader} from "../gl_util";
 import {toVelocityXClipcoords, toVelocityYClipcoords} from "./grids";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {FinestGrid, Solution, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
 
 export class ApplyPressureCorrectionX {
-  gl;
-  nx;
-  dx;
-  ny;
-  dy;
-  dt;
-  pressure;
-  velocityX;
-  velocityY;
-  waterMask;
+  gl: GL;
+  nx: number;
+  dx: number;
+  ny: number;
+  dy: number;
+  dt: number;
+  pressure: Solution & FinestGrid;
+  velocityX: StaggerXGrid;
+  velocityY: StaggerYGrid;
+  waterMask: FinestGrid;
 
-  program;
-  vao;
-  positions;
-  velocityXLocation;
-  waterMaskLocation;
-  pressureLocation;
+  program: GLProgram;
+  vao: GLVAO;
+  positions: Array<Array<number>>;
+  velocityXLocation: GLLocation;
+  waterMaskLocation: GLLocation;
+  pressureLocation: GLLocation;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
-              dt: num,
-              pressure: TwoPhaseRenderTarget,
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
+              dt: number,
+              pressure: Solution & FinestGrid,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,
-              waterMask: TwoPhaseRenderTarget) {
+              waterMask: FinestGrid) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -46,7 +48,7 @@ export class ApplyPressureCorrectionX {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -70,7 +72,7 @@ export class ApplyPressureCorrectionX {
         false, toVelocityXClipcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program) {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityXGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];

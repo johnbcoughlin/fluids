@@ -3,42 +3,31 @@ import {gridPointVertices} from "./grids";
 import {createProgram, loadShader} from "../gl_util";
 import type {TwoPhaseRenderTarget} from "./two_phase_render_target";
 import {flatten} from "./utils";
+import type {GL, GLProgram, GLVAO} from "./types";
 
 export class MultigridRender {
-  gl: any;
-  nx: num;
-  ny: num;
-  pressure: TwoPhaseRenderTarget;
-  divergence: TwoPhaseRenderTarget;
-  multigrid: TwoPhaseRenderTarget;
-  residualsMultigrid: TwoPhaseRenderTarget;
+  gl: GL;
+  nx: number;
+  ny: number;
 
-  program: any;
-  vaos: Array<any>;
-  coords: Array<Array<num>>;
+  program: GLProgram;
+  vaos: Array<GLVAO>;
+  coords: Array<Array<Array<number>>>;
 
   constructor(gl: any,
-              nx: num,
-              ny: num,
-              pressure: TwoPhaseRenderTarget,
-              divergence: TwoPhaseRenderTarget,
-              multigrid: TwoPhaseRenderTarget,
-              residualsMultigrid: TwoPhaseRenderTarget,
+              nx: number,
+              ny: number,
               vertexShaderSource: string,
               fragmentShaderSource: string) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
-    this.pressure = pressure;
-    this.divergence = divergence;
-    this.multigrid = multigrid;
-    this.residualsMultigrid = residualsMultigrid;
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     gl.useProgram(this.program);
     this.vaos = [];
     this.coords = [];
@@ -47,11 +36,11 @@ export class MultigridRender {
     this.initializeUniforms(gl, this.program);
   }
 
-  initializeUniforms(gl, program) {
+  initializeUniforms(gl: GL, program: GLProgram) {
     throw new Error("Implement me");
   }
 
-  setupPositions(gl) {
+  setupPositions(gl: GL) {
     this.vaos[0] = gl.createVertexArray();
     this.coords[0] = [];
     for (let i = 0; i < this.nx; i++) {
@@ -85,15 +74,15 @@ export class MultigridRender {
     }
   }
 
-  initializeLevel(level, levelNx, levelNy, offset) {
+  initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
     throw new Error("Implement me");
   }
 
-  vertexAttributeValues(level, i, j, offset) {
+  vertexAttributeValues(level: number, i: number, j: number, offset: number) {
     return [i + offset, j + offset];
   }
 
-  bindPositions(gl) {
+  bindPositions(gl: GL) {
     gl.useProgram(this.program);
     for (let level = 0; level < this.vaos.length; level++) {
       const buffer = gl.createBuffer();
@@ -106,7 +95,7 @@ export class MultigridRender {
     }
   }
 
-  bindCoordinateArrays(gl, program) {
+  bindCoordinateArrays(gl: GL, program: GLProgram) {
     throw new Error("implement me");
   }
 }

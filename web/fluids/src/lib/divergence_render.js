@@ -2,34 +2,36 @@
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {Divergence, FinestGrid, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
 
 export class DivergenceRender {
-  gl;
-  nx;
-  dx;
-  ny;
-  dy;
-  divergence: TwoPhaseRenderTarget;
-  velocityX: TwoPhaseRenderTarget;
-  velocityY: TwoPhaseRenderTarget;
-  waterMask: TwoPhaseRenderTarget;
-  solidDistance: TwoPhaseRenderTarget;
-  airDistance: TwoPhaseRenderTarget;
+  gl: GL;
+  nx: number;
+  dx: number;
+  ny: number;
+  dy: number;
+  divergence: Divergence;
+  velocityX: StaggerXGrid;
+  velocityY: StaggerYGrid;
+  waterMask: FinestGrid;
+  solidDistance: FinestGrid;
+  airDistance: FinestGrid;
 
-  program;
-  vao;
-  gridcoords;
-  uniformVelocityXTextureLocation;
-  uniformVelocityYTextureLocation;
-  waterMaskLocation;
-  solidDistanceLocation;
-  airDistanceLocation;
+  program: GLProgram;
+  vao: GLVAO;
+  gridcoords: Array<number>;
+  uniformVelocityXTextureLocation: GLLocation;
+  uniformVelocityYTextureLocation: GLLocation;
+  waterMaskLocation: GLLocation;
+  solidDistanceLocation: GLLocation;
+  airDistanceLocation: GLLocation;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
               divergence: TwoPhaseRenderTarget,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,
@@ -50,7 +52,7 @@ export class DivergenceRender {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -74,7 +76,7 @@ export class DivergenceRender {
     gl.uniform1f(gl.getUniformLocation(this.program, "dy"), this.dy);
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     const gridcoordsAttributeLocation = gl.getAttribLocation(program, "a_gridcoords");
     const buffer = gl.createBuffer();
     this.gridcoords = [];

@@ -11,12 +11,8 @@ class App extends Component {
   render() {
     return (
         <div className="App">
-          <header className="App-header">
-            <img src={logo} className="App-logo" alt="logo"/>
-            <h1 className="App-title">Welcome to React</h1>
-          </header>
           <div>
-            <canvas width={1400} height={1400}
+            <canvas width={800} height={800}
                     ref={(canvas) => {
                       this.initializeCanvas(canvas);
                     }}/>

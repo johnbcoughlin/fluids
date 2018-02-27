@@ -4,27 +4,35 @@ import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 import {flatten} from "./utils";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {Correction, FinestGrid, Multigrid, Solution} from "./gpu_fluid";
 
 export class MultigridInterpolatePressure {
-  gl;
-  nx;
-  ny;
-  multigrid: TwoPhaseRenderTarget;
-  corrections: TwoPhaseRenderTarget;
-  correctionsMultigrid: TwoPhaseRenderTarget;
-  waterMask: TwoPhaseRenderTarget;
+  gl: GL;
+  nx: number;
+  ny: number;
+  multigrid: Solution & Multigrid;
+  corrections: Correction & FinestGrid;
+  correctionsMultigrid: Correction & Multigrid;
+  waterMask: FinestGrid;
 
-  program;
-  vaos;
-  coords;
-  offsets;
+  program: GLProgram;
+  vaos: Array<GLVAO>;
+  coords: Array<Array<Array<number>>>;
+  offsets: Array<number>;
 
-  sourceLocation;
-  waterMaskLocation;
-  destinationLevelLocation;
-  offsetLocation;
+  sourceLocation: GLLocation;
+  waterMaskLocation: GLLocation;
+  destinationLevelLocation: GLLocation;
+  offsetLocation: GLLocation;
 
-  constructor(gl, nx, ny, multigrid, corrections, correctionsMultigrid, waterMask) {
+  constructor(gl: GL,
+              nx: number,
+              ny: number,
+              multigrid: Solution & Multigrid,
+              corrections: Correction & FinestGrid,
+              correctionsMultigrid: Correction & Multigrid,
+              waterMask: FinestGrid) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -32,10 +40,13 @@ export class MultigridInterpolatePressure {
     this.corrections = corrections;
     this.correctionsMultigrid = correctionsMultigrid;
     this.waterMask = waterMask;
+    this.coords = [];
+    this.vaos = [];
+    this.offsets = [];
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -48,14 +59,12 @@ export class MultigridInterpolatePressure {
     this.setupPositions(gl, this.program);
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     let targetLevel = 0;
     let targetLevelNx = this.nx;
     let targetLevelNy = this.ny;
     let offset = 0;
-    this.coords = [];
-    this.vaos = [];
-    this.offsets = [offset];
+    this.offsets[0] = offset;
 
     while (targetLevelNx > 2 && targetLevelNy > 2) {
       const levelCoords = [];
@@ -140,7 +149,7 @@ export class MultigridInterpolatePressure {
   }
 
   // interpolate from the given level to the level below
-  interpolateTo(level) {
+  interpolateTo(level: number) {
     this.gl.useProgram(this.program);
     // prepare to use the vertices referring to coordinates in the target level
     this.gl.uniform1i(this.destinationLevelLocation, level);

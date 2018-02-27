@@ -2,33 +2,39 @@
 import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {GL, GLLocation, GLProgram} from "./types";
+import type {FinestGrid, Multigrid, Pressure, Residual, RightHandSide} from "./gpu_fluid";
 
 export class ResidualsRender extends MultigridRender {
-  waterMask: TwoPhaseRenderTarget;
-  airDistance: TwoPhaseRenderTarget;
-  residuals: TwoPhaseRenderTarget;
-  rightHandSideMultigrid: TwoPhaseRenderTarget;
+  dx: number;
+  dy: number;
+  dt: number;
 
-  waterMaskLocation;
-  airDistanceLocation;
-  solutionLocation;
-  residualsLocation;
+  waterMask: FinestGrid;
+  airDistance: FinestGrid;
+  residuals: Residual & FinestGrid;
+  rightHandSideMultigrid: RightHandSide & Multigrid;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
-              dt: num,
-              waterMask: TwoPhaseRenderTarget,
+  waterMaskLocation: GLLocation;
+  airDistanceLocation: GLLocation;
+  solutionLocation: GLLocation;
+  residualsLocation: GLLocation;
+
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
+              dt: number,
+              waterMask: FinestGrid,
               airDistance: TwoPhaseRenderTarget,
-              pressure: TwoPhaseRenderTarget,
+              pressure: Pressure,
               divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
               rightHandSideMultigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, pressure, divergence, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
@@ -39,11 +45,11 @@ export class ResidualsRender extends MultigridRender {
     this.initialize(gl);
   }
 
-  initializeLevel(level, levelNx, levelNy, offset) {
+  initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
     // no-op
   }
 
-  initializeUniforms(gl, program) {
+  initializeUniforms(gl: GL, program: GLProgram) {
     this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
     this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
     this.residualsLocation = gl.getUniformLocation(program, "residuals");
@@ -54,11 +60,11 @@ export class ResidualsRender extends MultigridRender {
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
 
-  vertexAttributeValues(level, i, j, offset) {
+  vertexAttributeValues(level: number, i: number, j: number, offset: number) {
     return [i + offset, j + offset, i * Math.pow(2, level), j * Math.pow(2, level)];
   }
 
-  bindCoordinateArrays(gl, program) {
+  bindCoordinateArrays(gl: GL, program: GLProgram) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     gl.enableVertexAttribArray(gridcoordsLocation);
     gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 0);
@@ -67,7 +73,7 @@ export class ResidualsRender extends MultigridRender {
     gl.vertexAttribPointer(finestGridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
   }
 
-  render(level) {
+  render(level: number) {
     const gl = this.gl;
     const program = this.program;
     this.gl.useProgram(this.program);

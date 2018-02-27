@@ -1,5 +1,7 @@
 // @flow
 
+import type {GL} from "./types";
+
 export class TwoPhaseRenderTarget {
   // the WebGL2 Context
   gl;
@@ -20,7 +22,7 @@ export class TwoPhaseRenderTarget {
   currentRenderTarget: string = "B";
   usableTexture: string = "A";
 
-  constructor(gl, name: string, textureUnit, textureUnitInt, textureFactory, width, height) {
+  constructor(gl: GL, name: string, textureUnit, textureUnitInt, textureFactory, width, height) {
     this.gl = gl;
     this.name = name;
     this.textureUnit = textureUnit;

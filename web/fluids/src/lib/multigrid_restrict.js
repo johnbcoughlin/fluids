@@ -2,27 +2,35 @@
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords} from "./grids";
 import {flatten} from "./utils";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {FinestGrid, Multigrid, Residual, RightHandSide} from "./gpu_fluid";
 
 export class MultigridRestrictionRender {
-  gl;
-  nx;
-  ny;
-  residuals;
-  residualsMultigrid;
-  rightHandSideMultigrid;
-  waterMask;
+  gl: GL;
+  nx: number;
+  ny: number;
+  residuals: Residual & FinestGrid;
+  residualsMultigrid: Residual & Multigrid;
+  rightHandSideMultigrid: RightHandSide & Multigrid;
+  waterMask: FinestGrid;
 
-  program;
-  vaos;
-  coords;
-  offsets;
+  program: GLProgram;
+  vaos: Array<GLVAO>;
+  coords: Array<Array<Array<number>>>;
+  offsets: Array<number>;
 
-  sourceLocation;
-  waterMaskLocation;
-  destinationLevelLocation;
-  offsetLocation;
+  sourceLocation: GLLocation;
+  waterMaskLocation: GLLocation;
+  destinationLevelLocation: GLLocation;
+  offsetLocation: GLLocation;
 
-  constructor(gl, nx, ny, residuals, residualsMultigrid, rightHandSideMultigrid, waterMask) {
+  constructor(gl: GL,
+              nx: number,
+              ny: number,
+              residuals: Residual & FinestGrid,
+              residualsMultigrid: Residual & Multigrid,
+              rightHandSideMultigrid: RightHandSide & Multigrid,
+              waterMask: FinestGrid) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -34,7 +42,7 @@ export class MultigridRestrictionRender {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -50,7 +58,7 @@ export class MultigridRestrictionRender {
         false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     let sourceLevel = 0;
     let sourceLevelNx = this.nx;
     let sourceLevelNy = this.ny;
@@ -151,7 +159,7 @@ export class MultigridRestrictionRender {
     }
   }
 
-  restrictFrom(level) {
+  restrictFrom(level: number) {
     this.gl.useProgram(this.program);
 
     this.waterMask.useAsTexture(this.waterMaskLocation);

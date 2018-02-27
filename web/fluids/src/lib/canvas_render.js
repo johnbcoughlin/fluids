@@ -6,36 +6,41 @@ import {
 } from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {
+  Correction, Divergence, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution, StaggerXGrid,
+  StaggerYGrid
+} from "./gpu_fluid";
 
 export class CanvasRender {
-  gl;
-  nx;
-  ny;
-  velocityX;
-  velocityY;
+  gl: GL;
+  nx: number;
+  ny: number;
+  velocityX: StaggerXGrid;
+  velocityY: StaggerYGrid;
 
-  airDistance;
-  solidDistance;
-  pressure;
-  residuals;
-  multigrid;
-  residualsMultigrid;
-  dye;
-  corrections;
-  correctionsMultigrid;
-  divergence;
-  rightHandSideMultigrid;
+  airDistance: FinestGrid;
+  solidDistance: FinestGrid;
+  pressure: Pressure;
+  residuals: Residual & FinestGrid;
+  multigrid: Solution & Multigrid;
+  residualsMultigrid: Residual & Multigrid;
+  dye: FinestGrid;
+  corrections: Correction & FinestGrid;
+  correctionsMultigrid: Correction & Multigrid;
+  divergence: Divergence;
+  rightHandSideMultigrid: RightHandSide & Multigrid;
 
-  program;
-  vao;
-  solidDistanceLocation;
-  airDistanceLocation;
-  uniformTextureLocation;
-  normalizerLocation;
+  program: GLProgram;
+  vao: GLVAO;
+  solidDistanceLocation: GLLocation;
+  airDistanceLocation: GLLocation;
+  uniformTextureLocation: GLLocation;
+  normalizerLocation: GLLocation;
 
   constructor(gl: any,
-              nx: num,
-              ny: num,
+              nx: number,
+              ny: number,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,
               airDistance: TwoPhaseRenderTarget,
@@ -68,7 +73,7 @@ export class CanvasRender {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, canvasVertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, canvasFragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -93,7 +98,7 @@ export class CanvasRender {
         false, toGridTexcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([

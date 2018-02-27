@@ -3,31 +3,33 @@
 import {createProgram, loadShader} from "../gl_util";
 import {toGridTexcoords, toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import type {FinestGrid, StaggerYGrid} from "./gpu_fluid";
 
 export class BodyForcesRender {
-  gl;
-  nx;
-  dx;
-  ny;
-  dy;
-  dt;
-  g;
-  solidDistance;
-  velocityY;
+  gl: GL;
+  nx: number;
+  dx: number;
+  ny: number;
+  dy: number;
+  dt: number;
+  g: number;
+  solidDistance: TwoPhaseRenderTarget & FinestGrid;
+  velocityY: StaggerYGrid;
 
-  program;
-  vao;
-  positions;
-  solidDistanceLocation;
-  uniformTextureLocation;
+  program: GLProgram;
+  vao: GLVAO;
+  positions: Array<number>;
+  solidDistanceLocation: GLLocation;
+  uniformTextureLocation: GLLocation;
 
-  constructor(gl: any,
-              nx: num,
-              dx: num,
-              ny: num,
-              dy: num,
-              dt: num,
-              g: num,
+  constructor(gl: GL,
+              nx: number,
+              dx: number,
+              ny: number,
+              dy: number,
+              dt: number,
+              g: number,
               solidDistance: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget) {
     this.gl = gl;

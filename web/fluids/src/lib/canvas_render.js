@@ -128,12 +128,12 @@ export class CanvasRender {
 
     renderToTopRight(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
-    this.pressure.useAsTexture(this.uniformTextureLocation);
+    this.velocityX.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomLeft(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
-    this.divergence.useAsTexture(this.uniformTextureLocation);
+    this.velocityY.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomRight(this.gl);

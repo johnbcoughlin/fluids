@@ -285,7 +285,7 @@ export class GPUFluid {
   }
 
   solvePressure() {
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 51; i++) {
       // level 1
       this.errorCorrectionJacobiRender.render(0);
       this.errorCorrectionJacobiRender.render(0);
@@ -301,35 +301,40 @@ export class GPUFluid {
       this.errorCorrectionJacobiRender.render(2);
 
       // level 3
-      this.pressureResidualsRender.render(2);
-      this.restrictResidualsRender.restrictFrom(2);
-      this.errorCorrectionJacobiRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
+      // this.pressureResidualsRender.render(2);
+      // this.restrictResidualsRender.restrictFrom(2);
+      // this.errorCorrectionJacobiRender.render(3);
+      // this.errorCorrectionJacobiRender.render(3);
 
       // level 4
-      this.pressureResidualsRender.render(3);
-      this.restrictResidualsRender.restrictFrom(3);
-      for (let i = 0; i < 10; i++) {
-        this.errorCorrectionJacobiRender.render(4);
-        this.errorCorrectionJacobiRender.render(4);
-      }
-
-      this.interpolatePressureRender.interpolateTo(3);
-      this.addCorrectionRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
-
-      this.interpolatePressureRender.interpolateTo(2);
-      this.addCorrectionRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
+      // this.pressureResidualsRender.render(3);
+      // this.restrictResidualsRender.restrictFrom(3);
+      // for (let i = 0; i < 10; i++) {
+      //   this.errorCorrectionJacobiRender.render(4);
+      //   this.errorCorrectionJacobiRender.render(4);
+      // }
+      //
+      // this.interpolatePressureRender.interpolateTo(3);
+      // this.addCorrectionRender.render(3);
+      // this.errorCorrectionJacobiRender.render(3);
+      //
+      // this.interpolatePressureRender.interpolateTo(2);
+      // this.addCorrectionRender.render(2);
+      // this.errorCorrectionJacobiRender.render(2);
 
       this.interpolatePressureRender.interpolateTo(1);
       this.addCorrectionRender.render(1);
       this.errorCorrectionJacobiRender.render(1);
 
       // level 1
-      this.errorCorrectionJacobiRender.render(1);
       this.interpolatePressureRender.interpolateTo(0);
       this.addCorrectionRender.render(0);
+      this.errorCorrectionJacobiRender.render(0);
+    }
+  }
+
+  solvePressure2() {
+    for (let i = 0; i < 101; i++) {
       this.errorCorrectionJacobiRender.render(0);
     }
   }

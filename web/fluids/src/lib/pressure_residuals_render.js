@@ -148,7 +148,6 @@ void main() {
   float residual_here = texelFetch(residuals, here, 0).x;
   
   float norm = dt / (dx * dx);
-  // float norm = 1.0;
   int neighbors = water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down;
   

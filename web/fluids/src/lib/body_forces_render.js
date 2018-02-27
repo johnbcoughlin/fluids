@@ -2,9 +2,10 @@
 
 import {createProgram, loadShader} from "../gl_util";
 import {toGridTexcoords, toVelocityYClipcoords, toVelocityYTexcoords} from "./grids";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {FinestGrid, StaggerYGrid} from "./gpu_fluid";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {StaggerYGrid} from "./types";
+import type {FinestGrid} from "./types";
 
 export class BodyForcesRender {
   gl: GL;
@@ -44,7 +45,7 @@ export class BodyForcesRender {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, velocityYVertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, velocityYFragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -66,7 +67,7 @@ export class BodyForcesRender {
         false, toVelocityYClipcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityYGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];

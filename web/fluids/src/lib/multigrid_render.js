@@ -1,9 +1,9 @@
 // @flow
 import {gridPointVertices} from "./grids";
 import {createProgram, loadShader} from "../gl_util";
-import type {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import type {TwoPhaseRenderTarget} from "./render_targets";
 import {flatten} from "./utils";
-import type {GL, GLProgram, GLVAO} from "./types";
+import type {GL, GLProgram, GLVAO} from "./gl_types";
 
 export class MultigridRender {
   gl: GL;

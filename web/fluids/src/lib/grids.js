@@ -97,7 +97,7 @@ export const waterMask = (nx: number, ny: number): Array<number> => {
   return result;
 };
 
-export const airDistances = (nx: number, ny: number): Array<number> => {
+export const airDistances = (nx: number, ny: number): Array<Array<number>> => {
   const result = [];
   const borderLeft = solidBorderLeft(nx);
   const borderRight = solidBorderRight(nx);

@@ -1,6 +1,6 @@
 // @flow
 
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import {OnePhaseRenderTarget, TwoPhaseRenderTarget} from "./render_targets";
 import {CanvasRender} from "./canvas_render";
 import {BodyForcesRender} from "./body_forces_render";
 import {DivergenceRender} from "./divergence_render";
@@ -14,22 +14,12 @@ import {ApplyPressureCorrectionY} from "./apply_pressure_correction_y";
 import {ApplyPressureCorrectionX} from "./apply_pressure_correction_x";
 import {AdvectionRender} from "./advect_render";
 import {flatten} from "./utils";
-import type {GL} from "./types";
-
-// grid types
-export type FinestGrid = TwoPhaseRenderTarget & FinestGrid;
-export type Multigrid = TwoPhaseRenderTarget & Multigrid;
-export type StaggerXGrid = TwoPhaseRenderTarget & StaggerXGrid;
-export type StaggerYGrid = TwoPhaseRenderTarget & StaggerYGrid;
-
-export type Solution = TwoPhaseRenderTarget & Solution;
-export type RightHandSide = TwoPhaseRenderTarget & RightHandSide;
-export type Residual = TwoPhaseRenderTarget & Residual;
-export type Correction = TwoPhaseRenderTarget & Correction;
-
-export type Pressure = Solution & FinestGrid;
-export type Divergence = RightHandSide & FinestGrid;
-export type WaterMask = TwoPhaseRenderTarget & WaterMask;
+import type {GL} from "./gl_types";
+import {Residual, Solution, Correction, RightHandSide} from "./types";
+import {
+  Multigrid,
+  Pressure
+} from "./types";
 
 export class GPUFluid {
   // WebGL2 Context
@@ -50,7 +40,7 @@ export class GPUFluid {
   velocityX: StaggerXGrid;
   velocityY: StaggerYGrid;
   residuals: Residual & FinestGrid;
-  pressure: Solution & FinestGrid;
+  pressure: Pressure;
   multigrid: Solution & Multigrid;
   residualsMultigrid: Residual;
   divergence: Divergence;
@@ -72,7 +62,7 @@ export class GPUFluid {
   advectionRender: AdvectionRender;
   canvasRender: CanvasRender;
 
-  constructor(gl) {
+  constructor(gl: GL) {
     this.gl = gl;
     const n = 128;
     this.nx = n;
@@ -85,7 +75,7 @@ export class GPUFluid {
   }
 
   initialize(gl: GL) {
-    this.waterMask = new TwoPhaseRenderTarget(gl, "water", gl.TEXTURE0, 0, () => {
+    this.waterMask = new OnePhaseRenderTarget(gl, "water", gl.TEXTURE0, 0, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, this.nx, this.ny, 0, gl.RED_INTEGER, gl.INT,
           new Int32Array(waterMask(this.nx, this.ny)));
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -94,7 +84,7 @@ export class GPUFluid {
       // this is important.
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
-    this.airDistance = new TwoPhaseRenderTarget(gl, "air_distance", gl.TEXTURE1, 1, () => {
+    this.airDistance = new OnePhaseRenderTarget(gl, "air_distance", gl.TEXTURE1, 1, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, this.nx, this.ny, 0, gl.RGBA, gl.FLOAT,
           new Float32Array(flatten(airDistances(this.nx, this.ny))));
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -104,7 +94,7 @@ export class GPUFluid {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.solidDistance = new TwoPhaseRenderTarget(gl, "solid_distance", gl.TEXTURE2, 2, () => {
+    this.solidDistance = new OnePhaseRenderTarget(gl, "solid_distance", gl.TEXTURE2, 2, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, this.nx, this.ny, 0, gl.RGBA, gl.FLOAT,
           new Float32Array(flatten(solidDistances(this.nx, this.ny))));
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -148,14 +138,14 @@ export class GPUFluid {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }, this.nx, this.ny + 1);
 
-    this.residuals = new TwoPhaseRenderTarget(gl, "residuals", gl.TEXTURE5, 5, () => {
+    this.residuals = new OnePhaseRenderTarget(gl, "residuals", gl.TEXTURE5, 5, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.pressure = new TwoPhaseRenderTarget(gl, "pressure", gl.TEXTURE6, 6, () => {
+    this.pressure = new Pressure(gl, "pressure", gl.TEXTURE6, 6, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -175,7 +165,7 @@ export class GPUFluid {
         this.ny + Math.floor(Math.log2(this.ny)) * 2
     );
 
-    this.residualsMultigrid = new TwoPhaseRenderTarget(gl, "residualsMultigrid", gl.TEXTURE8, 8, () => {
+    this.residualsMultigrid = new OnePhaseRenderTarget(gl, "residualsMultigrid", gl.TEXTURE8, 8, () => {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
               this.nx + Math.floor(Math.log2(this.nx)) * 2,
               this.ny + Math.floor(Math.log2(this.ny)) * 2,
@@ -205,14 +195,14 @@ export class GPUFluid {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }, this.nx, this.ny);
 
-    this.corrections = new TwoPhaseRenderTarget(gl, "corrections", gl.TEXTURE10, 10, () => {
+    this.corrections = new OnePhaseRenderTarget(gl, "corrections", gl.TEXTURE10, 10, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.correctionsMultigrid = new TwoPhaseRenderTarget(gl, "correctionsMultigrid", gl.TEXTURE11, 11, () => {
+    this.correctionsMultigrid = new OnePhaseRenderTarget(gl, "correctionsMultigrid", gl.TEXTURE11, 11, () => {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
               this.nx + Math.floor(Math.log2(this.nx)) * 2,
               this.ny + Math.floor(Math.log2(this.ny)) * 2,
@@ -225,14 +215,14 @@ export class GPUFluid {
         this.ny + Math.floor(Math.log2(this.ny)) * 2
     );
 
-    this.divergence = new TwoPhaseRenderTarget(gl, "divergence", gl.TEXTURE12, 12, () => {
+    this.divergence = new OnePhaseRenderTarget(gl, "divergence", gl.TEXTURE12, 12, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.rightHandSideMultigrid = new TwoPhaseRenderTarget(gl, "rightHandSideMultigrid", gl.TEXTURE13, 13, () => {
+    this.rightHandSideMultigrid = new OnePhaseRenderTarget(gl, "rightHandSideMultigrid", gl.TEXTURE13, 13, () => {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
               this.nx + Math.floor(Math.log2(this.nx)) * 2,
               this.ny + Math.floor(Math.log2(this.ny)) * 2,
@@ -300,7 +290,7 @@ export class GPUFluid {
 
     this.advectionRender.advectDye();
     // requestAnimationFrame(() => this.render());
-    // setTimeout(() => this.render(), 100);
+    setTimeout(() => this.render(), 100);
   }
 
   solvePressure() {
@@ -314,32 +304,32 @@ export class GPUFluid {
       this.errorCorrectionJacobiRender.render(1);
 
       // level 2
-      this.pressureResidualsRender.render(1);
-      this.restrictResidualsRender.restrictFrom(1);
-      this.errorCorrectionJacobiRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
+      // this.pressureResidualsRender.render(1);
+      // this.restrictResidualsRender.restrictFrom(1);
+      // this.errorCorrectionJacobiRender.render(2);
+      // this.errorCorrectionJacobiRender.render(2);
 
       // level 3
-      this.pressureResidualsRender.render(2);
-      this.restrictResidualsRender.restrictFrom(2);
-      this.errorCorrectionJacobiRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
+      // this.pressureResidualsRender.render(2);
+      // this.restrictResidualsRender.restrictFrom(2);
+      // this.errorCorrectionJacobiRender.render(3);
+      // this.errorCorrectionJacobiRender.render(3);
 
       // level 4
-      this.pressureResidualsRender.render(3);
-      this.restrictResidualsRender.restrictFrom(3);
-      for (let i = 0; i < 10; i++) {
-        this.errorCorrectionJacobiRender.render(4);
-        this.errorCorrectionJacobiRender.render(4);
-      }
+      // this.pressureResidualsRender.render(3);
+      // this.restrictResidualsRender.restrictFrom(3);
+      // for (let i = 0; i < 10; i++) {
+      //   this.errorCorrectionJacobiRender.render(4);
+      //   this.errorCorrectionJacobiRender.render(4);
+      // }
 
-      this.interpolatePressureRender.interpolateTo(3);
-      this.addCorrectionRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
+      // this.interpolatePressureRender.interpolateTo(3);
+      // this.addCorrectionRender.render(3);
+      // this.errorCorrectionJacobiRender.render(3);
 
-      this.interpolatePressureRender.interpolateTo(2);
-      this.addCorrectionRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
+      // this.interpolatePressureRender.interpolateTo(2);
+      // this.addCorrectionRender.render(2);
+      // this.errorCorrectionJacobiRender.render(2);
 
       this.interpolatePressureRender.interpolateTo(1);
       this.addCorrectionRender.render(1);

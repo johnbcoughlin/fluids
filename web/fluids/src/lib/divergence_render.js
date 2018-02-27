@@ -1,9 +1,10 @@
 // @flow
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords, toVelocityXTexcoords, toVelocityYTexcoords} from "./grids";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {Divergence, FinestGrid, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {Divergence} from "./types";
+import type {FinestGrid, StaggerXGrid, StaggerYGrid} from "./types";
 
 export class DivergenceRender {
   gl: GL;

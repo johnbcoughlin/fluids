@@ -3,9 +3,10 @@
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
 import {flatten} from "./utils";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {Correction, FinestGrid, Multigrid, Solution} from "./gpu_fluid";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {Correction} from "./types";
+import type {FinestGrid, Multigrid, Solution} from "./types";
 
 export class MultigridInterpolatePressure {
   gl: GL;

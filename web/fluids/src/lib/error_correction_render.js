@@ -1,21 +1,24 @@
 // @flow
 import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {Divergence, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution} from "./gpu_fluid";
-import type {GL, GLLocation, GLProgram} from "./types";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {Divergence} from "./types";
+import type {GL, GLLocation, GLProgram} from "./gl_types";
+import type {Pressure, Residual, RightHandSide, Solution} from "./types";
+import type {RenderTarget} from "./render_targets";
+import {Multigrid, PressureMultigrid} from "./types";
 
 export class ErrorCorrectionJacobiRender extends MultigridRender {
   dx: number;
   dy: number;
   dt: number;
-  waterMask: FinestGrid;
-  airDistance: FinestGrid;
-  solidDistance: FinestGrid;
+  waterMask: RenderTarget;
+  airDistance: RenderTarget;
+  solidDistance: RenderTarget;
 
   pressure: Pressure;
   divergence: Divergence;
-  multigrid: Solution & Multigrid;
+  multigrid: PressureMultigrid;
   residualsMultigrid: Residual & Multigrid;
   rightHandSideMultigrid: RightHandSide & Multigrid;
 
@@ -34,7 +37,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               waterMask: TwoPhaseRenderTarget,
               airDistance: TwoPhaseRenderTarget,
               solidDistance: TwoPhaseRenderTarget,
-              pressure: TwoPhaseRenderTarget,
+              pressure: Pressure,
               divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,

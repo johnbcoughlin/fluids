@@ -1,10 +1,11 @@
 // @flow
 
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import {TwoPhaseRenderTarget} from "./render_targets";
 import {createProgram, loadShader} from "../gl_util";
 import {toVelocityXClipcoords, toVelocityYClipcoords} from "./grids";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {FinestGrid, Solution, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {Solution} from "./types";
+import type {FinestGrid, StaggerXGrid, StaggerYGrid} from "./types";
 
 export class ApplyPressureCorrectionX {
   gl: GL;
@@ -20,7 +21,7 @@ export class ApplyPressureCorrectionX {
 
   program: GLProgram;
   vao: GLVAO;
-  positions: Array<Array<number>>;
+  positions: Array<number>;
   velocityXLocation: GLLocation;
   waterMaskLocation: GLLocation;
   pressureLocation: GLLocation;
@@ -72,7 +73,7 @@ export class ApplyPressureCorrectionX {
         false, toVelocityXClipcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl: GL, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityXGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];

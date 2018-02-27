@@ -1,14 +1,20 @@
 // @flow
 import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {GL, GLLocation, GLProgram} from "./types";
-import type {FinestGrid, Multigrid, Pressure, Residual, RightHandSide} from "./gpu_fluid";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {GL, GLLocation, GLProgram} from "./gl_types";
+import type {Divergence} from "./types";
+import type {FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution} from "./types";
 
 export class ResidualsRender extends MultigridRender {
   dx: number;
   dy: number;
   dt: number;
+
+  pressure: Pressure;
+  divergence: Divergence;
+  multigrid: Solution & Multigrid;
+  residualsMultigrid: Residual & Multigrid;
 
   waterMask: FinestGrid;
   airDistance: FinestGrid;
@@ -38,6 +44,10 @@ export class ResidualsRender extends MultigridRender {
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
+    this.pressure = pressure;
+    this.divergence = divergence;
+    this.multigrid = multigrid;
+    this.residualsMultigrid = residualsMultigrid;
     this.waterMask = waterMask;
     this.airDistance = airDistance;
     this.residuals = residuals;

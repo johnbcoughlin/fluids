@@ -1,11 +1,23 @@
-// @flow
+import {TwoPhaseRenderTarget} from "./render_targets";
 
-export type GL = GL;
+export type StaggerXGrid = TwoPhaseRenderTarget & StaggerXGrid;
+export type StaggerYGrid = TwoPhaseRenderTarget & StaggerYGrid;
 
-export type GLProgram = GLProgram;
+// grid types
+interface Multigrid {}
+interface FinestGrid {}
 
-export type GLShader = GLShader;
+// types of grid contents
+// equation elements
+interface Unknown {}
+interface RightHandSide {}
+interface Residual {}
+interface Correction {}
 
-export type GLLocation = GLLocation;
+interface Mask {}
+interface Distances {}
 
-export type GLVAO = GLVAO;
+// concrete types
+export class Pressure extends TwoPhaseRenderTarget implements FinestGrid, Unknown {}
+export class PressureMultigrid extends TwoPhaseRenderTarget implements Multigrid, Unknown {}
+

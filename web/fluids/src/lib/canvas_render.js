@@ -5,12 +5,14 @@ import {
   renderToTopRight
 } from "../gl_util";
 import {toGridClipcoords, toGridTexcoords} from "./grids";
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
+import {TwoPhaseRenderTarget} from "./render_targets";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {
-  Correction, Divergence, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution, StaggerXGrid,
+  Divergence} from "./types";
+import type {
+  Correction, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution, StaggerXGrid,
   StaggerYGrid
-} from "./gpu_fluid";
+} from "./types";
 
 export class CanvasRender {
   gl: GL;

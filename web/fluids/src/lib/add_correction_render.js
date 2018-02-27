@@ -1,37 +1,51 @@
 // @flow
+
 import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
+import type {Pressure} from "./types";
+import type {GL, GLLocation, GLProgram} from "./gl_types";
+import type {Correction, FinestGrid, Multigrid, Solution} from "./types";
 
 export class AddCorrectionRender extends MultigridRender {
-  corrections;
-  correctionsMultigrid;
+  pressure: Solution & FinestGrid;
+  corrections: Correction & FinestGrid;
+  multigrid: Solution & Multigrid;
+  correctionsMultigrid: Correction & Multigrid;
 
-  correctionLocation;
-  solutionLocation;
+  correctionLocation: GLLocation;
+  solutionLocation: GLLocation;
 
-  constructor(gl, nx, ny, pressure, corrections, multigrid, correctionsMultigrid) {
-    super(gl, nx, ny, pressure, null, multigrid, null, vertexShaderSource, fragmentShaderSource);
+  constructor(gl: GL,
+              nx: number,
+              ny: number,
+              pressure: Pressure,
+              corrections: Correction & FinestGrid,
+              multigrid: Solution & Multigrid,
+              correctionsMultigrid: Correction & Multigrid) {
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
+    this.pressure = pressure;
     this.corrections = corrections;
+    this.multigrid = multigrid;
     this.correctionsMultigrid = correctionsMultigrid;
     this.initialize(gl);
   }
 
-  initializeUniforms(gl, program) {
+  initializeUniforms(gl: GL, program: GLProgram) {
     this.correctionLocation = gl.getUniformLocation(program, "correction");
     this.solutionLocation = gl.getUniformLocation(program, "solution");
   }
 
-  initializeLevel(level, levelNx, levelNy, offset) {
+  initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
     // no-op
   }
 
-  bindCoordinateArrays(gl, program) {
+  bindCoordinateArrays(gl: GL, program: GLProgram) {
     const gridcoordsLocation = gl.getAttribLocation(program, "a_gridcoords");
     gl.enableVertexAttribArray(gridcoordsLocation);
     gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render(level) {
+  render(level: number) {
     const gl = this.gl;
     gl.useProgram(this.program);
     if (level === 0) {

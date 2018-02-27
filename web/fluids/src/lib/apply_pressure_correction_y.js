@@ -1,10 +1,11 @@
 // @flow
 
-import {TwoPhaseRenderTarget} from "./two_phase_render_target";
+import {TwoPhaseRenderTarget} from "./render_targets";
 import {createProgram, loadShader} from "../gl_util";
 import {toVelocityYClipcoords} from "./grids";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {FinestGrid, Pressure, StaggerXGrid, StaggerYGrid} from "./gpu_fluid";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {Pressure} from "./types";
+import type {FinestGrid, StaggerXGrid, StaggerYGrid} from "./types";
 
 export class ApplyPressureCorrectionY {
   gl: GL;
@@ -16,11 +17,11 @@ export class ApplyPressureCorrectionY {
   pressure: Pressure;
   velocityX: StaggerXGrid;
   velocityY: StaggerYGrid;
-  waterMask: WaterMask;
+  waterMask: FinestGrid;
 
   program: GLProgram;
   vao: GLVAO;
-  positions: Array<Array<number>>;
+  positions: Array<number>;
   velocityYLocation: GLLocation;
   waterMaskLocation: GLLocation;
   pressureLocation: GLLocation;
@@ -48,7 +49,7 @@ export class ApplyPressureCorrectionY {
     this.initialize(gl);
   }
 
-  initialize(gl) {
+  initialize(gl: GL) {
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
@@ -72,7 +73,7 @@ export class ApplyPressureCorrectionY {
         false, toVelocityYClipcoords(this.nx, this.ny));
   }
 
-  setupPositions(gl, program) {
+  setupPositions(gl: GL, program: GLProgram) {
     const positionAttributeLocation = gl.getAttribLocation(program, "velocityYGridcoords");
     const positionBuffer = gl.createBuffer();
     this.positions = [];

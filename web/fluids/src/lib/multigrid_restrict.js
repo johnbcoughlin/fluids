@@ -2,8 +2,9 @@
 import {createProgram, loadShader} from "../gl_util";
 import {toGridClipcoords} from "./grids";
 import {flatten} from "./utils";
-import type {GL, GLLocation, GLProgram, GLVAO} from "./types";
-import type {FinestGrid, Multigrid, Residual, RightHandSide} from "./gpu_fluid";
+import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
+import type {Residual} from "./types";
+import type {FinestGrid, Multigrid, RightHandSide} from "./types";
 
 export class MultigridRestrictionRender {
   gl: GL;
@@ -171,9 +172,6 @@ export class MultigridRestrictionRender {
 
     if (level === 0) {
       this.residuals.useAsTexture(this.sourceLocation);
-      console.log(this.coords[0]);
-      console.log(this.offsets[0]);
-      console.log(this.vaos);
     } else {
       this.residualsMultigrid.useAsTexture(this.sourceLocation);
     }
@@ -216,34 +214,23 @@ void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
   
-  // ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
-  // bool water_here = texelFetch(waterMask, here, 0).x == 1;
-  // if (!water_here) {
-  //   value = 0.0;
-  //   return;
-  // }
-  //
-  // float foo = 
-  //     texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
-  //     texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
-  //     texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
-  //     texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
-  //     texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
-  //     texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
-  //     texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
-  //     texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
-  //     texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
-  value = 1.0;
-  vec4 bar = contributor1 + 
-  contributor2 +
-  contributor3 +
-  contributor4 +
-  contributor5 +
-  contributor6 +
-  contributor7 +
-  contributor8 +
-  contributor9;
-  value = bar.x;
+  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
+  bool water_here = texelFetch(waterMask, here, 0).x == 1;
+  if (!water_here) {
+    value = 0.0;
+    return;
+  }
+
+  value = 
+      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
+      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
+      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
+      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
+      texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
+      texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
+      texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
+      texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
+      texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
 }
 `;
 
@@ -255,6 +242,6 @@ in float value;
 out float Value;
 
 void main() {
-  Value = 1.0;
+  Value = value;
 }
 `;

@@ -9,7 +9,7 @@ export class MultigridRender {
   nx: num;
   ny: num;
   pressure: TwoPhaseRenderTarget;
-  residuals: TwoPhaseRenderTarget;
+  divergence: TwoPhaseRenderTarget;
   multigrid: TwoPhaseRenderTarget;
   residualsMultigrid: TwoPhaseRenderTarget;
 
@@ -21,7 +21,7 @@ export class MultigridRender {
               nx: num,
               ny: num,
               pressure: TwoPhaseRenderTarget,
-              residuals: TwoPhaseRenderTarget,
+              divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,
               vertexShaderSource: string,
@@ -30,7 +30,7 @@ export class MultigridRender {
     this.nx = nx;
     this.ny = ny;
     this.pressure = pressure;
-    this.residuals = residuals;
+    this.divergence = divergence;
     this.multigrid = multigrid;
     this.residualsMultigrid = residualsMultigrid;
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
@@ -66,6 +66,7 @@ export class MultigridRender {
     let offset = 0;
 
     while (levelNx > 2 && levelNy > 2) {
+      console.log(level);
       const levelCoords = [];
       for (let i = 0; i < levelNx; i++) {
         for (let j = 0; j < levelNy; j++) {

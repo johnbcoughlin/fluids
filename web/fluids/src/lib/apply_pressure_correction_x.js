@@ -129,7 +129,7 @@ void main() {
   float pressure_right = texelFetch(pressure, here, 0).x;
   float pressure_left = texelFetch(pressure, here - ivec2(1, 0), 0).x;
   float p_grad = (pressure_right - pressure_left) / dx;
-  value = velocityXHere + p_grad * dt;
+  value = velocityXHere - p_grad * dt;
 }
 `;
 

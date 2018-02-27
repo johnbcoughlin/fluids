@@ -157,6 +157,6 @@ void main() {
   float U = !solid_up ? texelFetch(u_velocityYTexture, here + ivec2(0, 1), 0).x : u_solid;
   float D = !solid_down ? texelFetch(u_velocityYTexture, here, 0).x : u_solid;
   
-  divergence = ((R - L) / dx + (U - D) / dy);
+  divergence = -((R - L) / dx + (U - D) / dy);
 }
 `;

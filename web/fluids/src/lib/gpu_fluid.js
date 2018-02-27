@@ -56,7 +56,7 @@ export class GPUFluid {
 
   constructor(gl) {
     this.gl = gl;
-    const n = 40;
+    const n = 128;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -99,7 +99,7 @@ export class GPUFluid {
     this.velocityX = new TwoPhaseRenderTarget(gl, "u_x", gl.TEXTURE3, 3, () => {
       const data = [];
       for (let j = 0; j < this.ny; j++) {
-        for (let i = 0; i < this.nx+1; i++) {
+        for (let i = 0; i < this.nx + 1; i++) {
           if (i === this.nx / 2 && j === this.ny / 2) {
             data.push(0.0);
           } else {
@@ -115,10 +115,10 @@ export class GPUFluid {
 
     this.velocityY = new TwoPhaseRenderTarget(gl, "u_y", gl.TEXTURE4, 4, () => {
       const data = [];
-      for (let j = 0; j < this.ny+1; j++) {
+      for (let j = 0; j < this.ny + 1; j++) {
         for (let i = 0; i < this.nx; i++) {
-          if (i === this.nx / 2 && j === this.ny / 2) {
-            data.push(0.0);
+          if (i === this.nx / 2 && j > this.ny / 3 && j < 2 * this.ny / 3) {
+            data.push(-j);
           } else {
             data.push(0.0);
           }
@@ -174,8 +174,8 @@ export class GPUFluid {
       const data = [];
       for (let j = 0; j < this.ny; j++) {
         for (let i = 0; i < this.nx; i++) {
-          if (i === this.nx / 2) {
-            data.push(1.0);
+          if (j === this.ny / 2) {
+            data.push(10.0);
           } else {
             data.push(0.0);
           }
@@ -207,29 +207,53 @@ export class GPUFluid {
         this.ny + Math.floor(Math.log2(this.ny)) * 2
     );
 
+    this.divergence = new TwoPhaseRenderTarget(gl, "divergence", gl.TEXTURE12, 12, () => {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, this.nx, this.ny, 0, gl.RED, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    }, this.nx, this.ny);
+
+    this.rightHandSideMultigrid = new TwoPhaseRenderTarget(gl, "rightHandSideMultigrid", gl.TEXTURE13, 13, () => {
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
+              this.nx + Math.floor(Math.log2(this.nx)) * 2,
+              this.ny + Math.floor(Math.log2(this.ny)) * 2,
+              0, gl.RED, gl.FLOAT, null);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        },
+        this.nx + Math.floor(Math.log2(this.nx)) * 2,
+        this.ny + Math.floor(Math.log2(this.ny)) * 2
+    );
+
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.g, this.solidDistance, this.velocityY);
-    this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.residuals,
+    this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.divergence,
         this.velocityX, this.velocityY, this.waterMask, this.solidDistance, this.airDistance);
+
     this.pressureResidualsRender = new ResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.waterMask, this.airDistance, this.pressure, this.residuals, this.multigrid,
-        this.residualsMultigrid);
+        this.dt, this.waterMask, this.airDistance,
+        this.pressure, this.divergence,
+        this.multigrid, this.residualsMultigrid,
+        this.residuals, this.rightHandSideMultigrid);
 
     this.restrictResidualsRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.residuals,
-        this.residualsMultigrid, this.waterMask);
+        this.residualsMultigrid, this.rightHandSideMultigrid, this.waterMask);
     this.interpolatePressureRender = new MultigridInterpolatePressure(gl, this.nx, this.ny,
         this.multigrid, this.corrections, this.correctionsMultigrid, this.waterMask);
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airDistance, this.solidDistance,
-        this.pressure, this.residuals, this.multigrid, this.residualsMultigrid);
+        this.pressure, this.divergence, this.multigrid, this.rightHandSideMultigrid);
 
-    this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny, this.pressure, this.corrections,
+    this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny,
+        this.pressure, this.corrections,
         this.multigrid, this.correctionsMultigrid);
 
-    this.applyPressureCorrectionYRender = new ApplyPressureCorrectionY(this.gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
     this.applyPressureCorrectionXRender = new ApplyPressureCorrectionX(this.gl, this.nx, this.dx, this.ny, this.dy,
+        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
+    this.applyPressureCorrectionYRender = new ApplyPressureCorrectionY(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
 
     this.advectionRender = new AdvectionRender(this.gl, this.nx, this.dx, this.ny, this.dy, this.dt,
@@ -238,28 +262,75 @@ export class GPUFluid {
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,
         this.pressure, this.residuals, this.multigrid, this.residualsMultigrid,
-        this.dye, this.corrections, this.correctionsMultigrid);
+        this.dye, this.corrections, this.correctionsMultigrid, this.divergence);
   }
 
   render() {
+    console.log("frame");
     this.bodyForcesRender.render();
+
+    this.advectionRender.advectX();
+    this.advectionRender.advectY();
     this.divergenceRender.render();
-    this.step();
+
+    this.solvePressure();
+    this.applyPressureCorrectionXRender.render();
+    this.applyPressureCorrectionYRender.render();
+
+    this.divergenceRender.render();
+    this.canvasRender.render();
+
+    this.advectionRender.advectDye();
+    requestAnimationFrame(() => this.render());
   }
 
-  step() {
-    this.errorCorrectionJacobiRender.render(0);
-    this.errorCorrectionJacobiRender.render(0);
-    // this.pressureResidualsRender.render(0);
-    // this.restrictResidualsRender.restrictFrom(0);
-    // this.errorCorrectionJacobiRender.render(1);
-    // this.errorCorrectionJacobiRender.render(1);
-    // this.pressureResidualsRender.render(1);
-    // this.interpolatePressureRender.interpolateTo(0);
-    // this.addCorrectionRender.render(0);
-    // this.errorCorrectionJacobiRender.render(0);
+  solvePressure() {
+    for (let i = 0; i < 50; i++) {
+      // level 1
+      this.errorCorrectionJacobiRender.render(0);
+      this.errorCorrectionJacobiRender.render(0);
+      this.pressureResidualsRender.render(0);
+      this.restrictResidualsRender.restrictFrom(0);
+      this.errorCorrectionJacobiRender.render(1);
+      this.errorCorrectionJacobiRender.render(1);
 
-    this.canvasRender.render();
-    requestAnimationFrame(() => this.step());
+      // level 2
+      this.pressureResidualsRender.render(1);
+      this.restrictResidualsRender.restrictFrom(1);
+      this.errorCorrectionJacobiRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
+
+      // level 3
+      this.pressureResidualsRender.render(2);
+      this.restrictResidualsRender.restrictFrom(2);
+      this.errorCorrectionJacobiRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
+
+      // level 4
+      this.pressureResidualsRender.render(3);
+      this.restrictResidualsRender.restrictFrom(3);
+      for (let i = 0; i < 10; i++) {
+        this.errorCorrectionJacobiRender.render(4);
+        this.errorCorrectionJacobiRender.render(4);
+      }
+
+      this.interpolatePressureRender.interpolateTo(3);
+      this.addCorrectionRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
+
+      this.interpolatePressureRender.interpolateTo(2);
+      this.addCorrectionRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
+
+      this.interpolatePressureRender.interpolateTo(1);
+      this.addCorrectionRender.render(1);
+      this.errorCorrectionJacobiRender.render(1);
+
+      // level 1
+      this.errorCorrectionJacobiRender.render(1);
+      this.interpolatePressureRender.interpolateTo(0);
+      this.addCorrectionRender.render(0);
+      this.errorCorrectionJacobiRender.render(0);
+    }
   }
 }

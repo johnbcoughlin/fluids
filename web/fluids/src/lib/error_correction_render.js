@@ -1,5 +1,5 @@
 // @flow
-import {toGridClipcoords, toGridTexcoords, toGridTexcoordsWithOffset} from "./grids";
+import {toGridClipcoords} from "./grids";
 import {MultigridRender} from "./multigrid_render";
 import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 
@@ -11,7 +11,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   airDistance;
   solidDistance;
 
-  toFinestGridTexcoords;
   waterMaskLocation;
   airDistanceLocation;
   solidDistanceLocation;
@@ -28,11 +27,10 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               airDistance: TwoPhaseRenderTarget,
               solidDistance: TwoPhaseRenderTarget,
               pressure: TwoPhaseRenderTarget,
-              residuals: TwoPhaseRenderTarget,
+              divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, pressure, residuals, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
-    this.toFinestGridTexcoords = [toGridTexcoords(nx, ny)];
+    super(gl, nx, ny, pressure, divergence, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
@@ -53,7 +51,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   }
 
   initializeLevel(level, levelNx, levelNy, offset) {
-    this.toFinestGridTexcoords[level] = toGridTexcoordsWithOffset(levelNx, levelNy, offset);
   }
 
   vertexAttributeValues(level, i, j, offset) {
@@ -73,50 +70,24 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     const gl = this.gl;
     const program = this.program;
     gl.useProgram(program);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(program, "toFinestGridTexcoords"),
-        false, this.toFinestGridTexcoords[level]);
+
+    gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * Math.pow(2, level));
+    gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * Math.pow(2, level));
 
     if (level === 0) {
-      gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx);
-      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy);
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(program, "toGridTexcoords"),
-          false, toGridTexcoords(this.nx, this.ny));
-      this.renderAToB(level, this.pressure, this.residuals);
-      this.renderBToA(level, this.pressure, this.residuals);
-
+      this.renderAToB(level, this.pressure, this.divergence);
     } else {
-      gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * 2);
-      gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * 2);
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      gl.uniformMatrix4fv(
-          gl.getUniformLocation(program, "toGridTexcoords"),
-          false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
       this.renderAToB(level, this.multigrid, this.residualsMultigrid);
-      this.renderBToA(level, this.multigrid, this.residualsMultigrid);
-
     }
   }
 
   renderAToB(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
-    this.waterMask.useAsTexture(this.waterMaskLocation);
-    this.airDistance.useAsTexture(this.airDistanceLocation);
-    residuals.useAsTexture(this.residualsLocation);
-    solution.useAsTexture(this.solutionLocation);
-    solution.renderTo();
-    this.gl.bindVertexArray(this.vaos[level]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
-    this.gl.bindVertexArray(null);
-    solution.swap();
-  }
-
-  renderBToA(level: num, solution: TwoPhaseRenderTarget, residuals: TwoPhaseRenderTarget) {
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.airDistance.useAsTexture(this.airDistanceLocation);
     residuals.useAsTexture(this.residualsLocation);
@@ -142,9 +113,6 @@ uniform sampler2D airDistance;
 uniform sampler2D solidDistance;
 uniform sampler2D solution;
 uniform sampler2D residuals;
-
-uniform mat4 toGridTexcoords;
-uniform mat4 toFinestGridTexcoords;
 
 out float new_solution;
 

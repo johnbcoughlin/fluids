@@ -23,6 +23,7 @@ export class CanvasRender {
   dye;
   corrections;
   correctionsMultigrid;
+  divergence;
 
   program;
   vao;
@@ -44,7 +45,8 @@ export class CanvasRender {
               residualsMultigrid: TwoPhaseRenderTarget,
               dye: TwoPhaseRenderTarget,
               corrections: TwoPhaseRenderTarget,
-              correctionsMultigrid: TwoPhaseRenderTarget) {
+              correctionsMultigrid: TwoPhaseRenderTarget,
+              divergence: TwoPhaseRenderTarget) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -59,6 +61,7 @@ export class CanvasRender {
     this.dye = dye;
     this.corrections = corrections;
     this.correctionsMultigrid = correctionsMultigrid;
+    this.divergence = divergence;
     this.initialize(gl);
   }
 
@@ -119,23 +122,23 @@ export class CanvasRender {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     renderToTopLeft(this.gl);
+    this.gl.uniform1f(this.normalizerLocation, 10.0);
+    this.dye.useAsTexture(this.uniformTextureLocation);
+    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+
+    renderToTopRight(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
     this.pressure.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
-    renderToTopRight(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.residuals.useAsTexture(this.uniformTextureLocation);
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
-
     renderToBottomLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.multigrid.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 1.0 / 10.0);
+    this.divergence.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomRight(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.residualsMultigrid.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 100.0);
+    this.multigrid.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 
@@ -200,6 +203,8 @@ void main() {
   // } else {
   if (p > 0.0) {
     outColor = vec4(0.0, 0.0, p, 1.0);
+  } else if (p < -0.95) {
+    outColor = vec4(0.0, abs(p), 0.0, 1.0);
   } else if (p != 0.0) {
     outColor = vec4(abs(p), 0.0, 0.0, 1.0);
   } else {

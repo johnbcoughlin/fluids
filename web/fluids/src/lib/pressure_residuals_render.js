@@ -6,6 +6,8 @@ import {TwoPhaseRenderTarget} from "./two_phase_render_target";
 export class ResidualsRender extends MultigridRender {
   waterMask: TwoPhaseRenderTarget;
   airDistance: TwoPhaseRenderTarget;
+  residuals: TwoPhaseRenderTarget;
+  rightHandSideMultigrid: TwoPhaseRenderTarget;
 
   waterMaskLocation;
   airDistanceLocation;
@@ -21,15 +23,19 @@ export class ResidualsRender extends MultigridRender {
               waterMask: TwoPhaseRenderTarget,
               airDistance: TwoPhaseRenderTarget,
               pressure: TwoPhaseRenderTarget,
-              residuals: TwoPhaseRenderTarget,
+              divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
-              residualsMultigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, pressure, residuals, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
+              residualsMultigrid: TwoPhaseRenderTarget,
+              residuals: TwoPhaseRenderTarget,
+              rightHandSideMultigrid: TwoPhaseRenderTarget) {
+    super(gl, nx, ny, pressure, divergence, multigrid, residualsMultigrid, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
     this.waterMask = waterMask;
     this.airDistance = airDistance;
+    this.residuals = residuals;
+    this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
   }
 
@@ -73,14 +79,14 @@ export class ResidualsRender extends MultigridRender {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.nx, this.ny));
-      this.residuals.useAsTexture(this.residualsLocation);
+      this.divergence.useAsTexture(this.residualsLocation);
       this.pressure.useAsTexture(this.solutionLocation);
       this.residuals.renderTo();
     } else {
       gl.uniformMatrix4fv(
           gl.getUniformLocation(program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-      this.residualsMultigrid.useAsTexture(this.residualsLocation);
+      this.rightHandSideMultigrid.useAsTexture(this.residualsLocation);
       this.multigrid.useAsTexture(this.solutionLocation);
       this.residualsMultigrid.renderTo();
     }
@@ -108,7 +114,7 @@ uniform float dt;
 uniform mediump isampler2D waterMask;
 uniform mediump sampler2D airDistance;
 uniform sampler2D residuals;
-uniform mediump sampler2D solution;
+uniform sampler2D solution;
 
 out float new_residual;
 
@@ -142,6 +148,7 @@ void main() {
   float residual_here = texelFetch(residuals, here, 0).x;
   
   float norm = dt / (dx * dx);
+  // float norm = 1.0;
   int neighbors = water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down;
   

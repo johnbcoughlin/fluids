@@ -9,6 +9,7 @@ export class MultigridRestrictionRender {
   ny;
   residuals;
   residualsMultigrid;
+  rightHandSideMultigrid;
   waterMask;
 
   program;
@@ -19,12 +20,13 @@ export class MultigridRestrictionRender {
   waterMaskLocation;
   destinationLevelLocation;
 
-  constructor(gl, nx, ny, residuals, residualsMultigrid, waterMask) {
+  constructor(gl, nx, ny, residuals, residualsMultigrid, rightHandSideMultigrid, waterMask) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
     this.residuals = residuals;
     this.residualsMultigrid = residualsMultigrid;
+    this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.waterMask = waterMask;
 
     this.initialize(gl);
@@ -151,16 +153,15 @@ export class MultigridRestrictionRender {
 
     if (level === 0) {
       this.residuals.useAsTexture(this.sourceLocation);
-      this.residualsMultigrid.renderTo();
     } else {
       this.residualsMultigrid.useAsTexture(this.sourceLocation);
-      this.residualsMultigrid.renderTo();
     }
+    this.rightHandSideMultigrid.renderTo();
     this.gl.bindVertexArray(this.vaos[level]);
     this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
     this.gl.bindVertexArray(null);
 
-    this.residualsMultigrid.swap();
+    this.rightHandSideMultigrid.swap();
   }
 }
 

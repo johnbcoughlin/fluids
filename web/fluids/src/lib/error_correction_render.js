@@ -26,7 +26,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   airDistanceLocation: GLLocation;
   solidDistanceLocation: GLLocation;
   solutionLocation: GLLocation;
-  residualsLocation: GLLocation;
+  rightHandSideLocation: GLLocation;
 
   constructor(gl: GL,
               nx: number,
@@ -64,7 +64,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
     this.solidDistanceLocation = gl.getUniformLocation(program, "solidDistance");
     this.solutionLocation = gl.getUniformLocation(program, "solution");
-    this.residualsLocation = gl.getUniformLocation(program, "residuals");
+    this.rightHandSideLocation = gl.getUniformLocation(program, "rightHandSide");
 
     gl.uniform1f(gl.getUniformLocation(program, "dt"), this.dt);
   }
@@ -92,6 +92,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
 
     gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * Math.pow(2, level));
     gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * Math.pow(2, level));
+    this.waterMask.useAsTexture(this.waterMaskLocation);
+    this.airDistance.useAsTexture(this.airDistanceLocation);
 
     if (level === 0) {
       gl.uniformMatrix4fv(
@@ -106,10 +108,8 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     }
   }
 
-  renderAToB(level: number, solution: Solution, residuals: Residual) {
-    this.waterMask.useAsTexture(this.waterMaskLocation);
-    this.airDistance.useAsTexture(this.airDistanceLocation);
-    residuals.useAsTexture(this.residualsLocation);
+  renderAToB(level: number, solution: Solution, rightHandSide: Residual) {
+    rightHandSide.useAsTexture(this.rightHandSideLocation);
     solution.useAsTexture(this.solutionLocation);
     solution.renderTo();
     this.gl.bindVertexArray(this.vaos[level]);
@@ -131,7 +131,7 @@ uniform mediump isampler2D waterMask;
 uniform sampler2D airDistance;
 uniform sampler2D solidDistance;
 uniform sampler2D solution;
-uniform sampler2D residuals;
+uniform sampler2D rightHandSide;
 
 out float new_solution;
 
@@ -165,13 +165,13 @@ void main() {
   float solution_down = texelFetch(solution, ihere + ivec2(0, -1), 0).x;
   
   float solution_here = texelFetch(solution, ihere, 0).x;
-  float residual_here = texelFetch(residuals, ihere, 0).x;
+  float rightHandSideHere = texelFetch(rightHandSide, ihere, 0).x;
   
   float norm = dt / (dx * dx);
   float d = float(water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down) * norm;
   
-  float z = (1.0 / d) * (residual_here +
+  float z = (1.0 / d) * (rightHandSideHere +
       (float(water_left) * solution_left + 
       float(water_right) * solution_right +
       float(water_up) * solution_up + 

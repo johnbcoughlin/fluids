@@ -133,7 +133,7 @@ export class CanvasRender {
 
     renderToTopLeft(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 10.0);
-    this.dye.useAsTexture(this.uniformTextureLocation);
+    this.pressure.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToTopRight(this.gl);
@@ -154,7 +154,7 @@ export class CanvasRender {
     this.gl.uniformMatrix4fv(
         this.gl.getUniformLocation(this.program, "toGridTexcoords"),
         false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
-    this.rightHandSideMultigrid.useAsTexture(this.uniformTextureLocation);
+    this.divergence.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 

@@ -281,20 +281,29 @@ export class GPUFluid {
     this.advectionRender.advectY();
     this.divergenceRender.render();
 
-    this.solvePressure();
+    for (let i = 0; i < 400; i++) {
+      this.errorCorrectionJacobiRender.render(0);
+      this.pressureResidualsRender.render(0);
+      // this.restrictResidualsRender.restrictFrom(0);
+      // this.errorCorrectionJacobiRender.render(1);
+      // this.interpolatePressureRender.interpolateTo(0);
+      // this.addCorrectionRender.render(0);
+    }
+
+    // this.solvePressure();
     this.applyPressureCorrectionXRender.render();
     this.applyPressureCorrectionYRender.render();
-
+    //
     this.divergenceRender.render();
     this.canvasRender.render();
 
     this.advectionRender.advectDye();
     // requestAnimationFrame(() => this.render());
-    setTimeout(() => this.render(), 100);
+    // setTimeout(() => this.render(), 1000);
   }
 
   solvePressure() {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 1; i++) {
       // level 1
       this.errorCorrectionJacobiRender.render(0);
       this.errorCorrectionJacobiRender.render(0);

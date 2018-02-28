@@ -17,6 +17,18 @@ class App extends Component {
                       this.initializeCanvas(canvas);
                     }}/>
           </div>
+          {
+            [0, 1, 2, 3].map((level) => (
+                <div>
+                  <span>Level {level}</span>
+                  <button onClick={() => this.fluid.errorCorrect(level)}>Smooth</button>
+                  <button onClick={() => this.fluid.computeResiduals(level)}>Residuals</button>
+                  <button onClick={() => this.fluid.restrictFrom(level)}>Restrict</button>
+                  <button onClick={() => this.fluid.interpolateFrom(level)}>Interpolate</button>
+                  <button onClick={() => this.fluid.correct(level)}>Correct</button>
+                </div>
+            ))
+          }
         </div>
     );
   }

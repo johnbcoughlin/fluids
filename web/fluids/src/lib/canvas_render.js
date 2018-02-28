@@ -132,17 +132,17 @@ export class CanvasRender {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     renderToTopLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 10.0);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
     this.pressure.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToTopRight(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 10.0);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
     this.residuals.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 100.0);
+    this.gl.uniform1f(this.normalizerLocation, 10.0);
     this.gl.uniformMatrix4fv(
         this.gl.getUniformLocation(this.program, "toGridTexcoords"),
         false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
@@ -150,11 +150,8 @@ export class CanvasRender {
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomRight(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 100.0);
-    this.gl.uniformMatrix4fv(
-        this.gl.getUniformLocation(this.program, "toGridTexcoords"),
-        false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
-    this.divergence.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 1.0);
+    this.residualsMultigrid.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 
@@ -216,7 +213,7 @@ void main() {
   //   outColor = vec4(0.2, 0.2, 0.2, 1.0);
   // } else if (air) {
   //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  // } else {
+  // } else 
   if (p > 0.0) {
     outColor = vec4(0.0, 0.0, p, 1.0);
   } else if (p < -0.95) {

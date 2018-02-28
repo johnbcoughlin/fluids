@@ -41,7 +41,6 @@ export class MultigridRender {
   }
 
   setupPositions(gl: GL) {
-    this.vaos[0] = gl.createVertexArray();
     this.coords[0] = [];
     for (let i = 0; i < this.nx; i++) {
       for (let j = 0; j < this.ny; j++) {
@@ -55,7 +54,6 @@ export class MultigridRender {
     let offset = 0;
 
     while (levelNx > 2 && levelNy > 2) {
-      console.log(level);
       const levelCoords = [];
       for (let i = 0; i < levelNx; i++) {
         for (let j = 0; j < levelNy; j++) {
@@ -63,7 +61,6 @@ export class MultigridRender {
         }
       }
       this.coords[level] = levelCoords;
-      this.vaos[level] = gl.createVertexArray();
 
       this.initializeLevel(level, levelNx, levelNy, offset);
 
@@ -72,6 +69,7 @@ export class MultigridRender {
       levelNy = Math.floor(levelNy / 2);
       level += 1;
     }
+    console.log("everything else", this.coords);
   }
 
   initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
@@ -84,14 +82,16 @@ export class MultigridRender {
 
   bindPositions(gl: GL) {
     gl.useProgram(this.program);
-    for (let level = 0; level < this.vaos.length; level++) {
+    for (let level = 0; level < this.coords.length; level++) {
       const buffer = gl.createBuffer();
-      gl.bindVertexArray(this.vaos[level]);
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flatten(this.coords[level])), gl.STATIC_DRAW);
+      const vao = gl.createVertexArray();
+      this.vaos.push(vao);
+      gl.bindVertexArray(vao);
       this.bindCoordinateArrays(gl, this.program);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
       gl.bindVertexArray(null);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
   }
 

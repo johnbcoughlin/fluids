@@ -7,6 +7,7 @@ import type {GL, GLLocation, GLProgram} from "./gl_types";
 import type {Pressure, Residual, RightHandSide, Solution} from "./types";
 import type {RenderTarget} from "./render_targets";
 import {Multigrid, PressureMultigrid} from "./types";
+import {flatten} from "./utils";
 
 export class ErrorCorrectionJacobiRender extends MultigridRender {
   dx: number;
@@ -179,6 +180,7 @@ void main() {
       
   float omega = 0.8;
   new_solution = solution_here + omega * (z - solution_here);
+  // new_solution = 1.0 - solution_here;
 }
 `;
 

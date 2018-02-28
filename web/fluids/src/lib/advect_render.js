@@ -195,6 +195,26 @@ uniform float dt;
 
 out float q;
 
+// find the point on the water boundary closest to the origin, 
+// in the direction of the given vector, not exceeding the bound.
+vec2 waterBoundary(vec2 origin, float bound, vec2 direction) {
+  float lowerBound = 0.0;
+  float upperBound = bound;
+  float testPoint = bound / 2.0;
+  
+  while (upperBound - lowerBound > 0.1) {
+    vec4 point = vec4(origin + direction * testPoint, 0.0, 1.0);
+    bool waterAtTest = texture(waterMask, (toScalarTexcoords * point).xy).x == 0;
+    if (waterAtTest) {
+      lowerBound = testPoint;
+    } else {
+      upperBound = testPoint;
+    }
+    testPoint = (upperBound + lowerBound) / 2.0;
+  }
+  return origin + direction * lowerBound;
+}
+
 void main() {
   gl_Position = toClipcoords * a_gridcoords;
   gl_PointSize = 1.0;
@@ -203,13 +223,14 @@ void main() {
   float u_x = texture(velocityX, (toVelocityXTexcoords * a_gridcoords).xy).x;
   float u_y = texture(velocityY, (toVelocityYTexcoords * a_gridcoords).xy).x;
   
-  vec2 there = a_gridcoords.xy - (dt * vec2(u_x, u_y));
+  float lambda = dt;
+  vec2 dir = vec2(-u_x, -u_y);
+  vec2 there = a_gridcoords.xy + lambda * dir;
   int water_there = texelFetch(waterMask, ivec2(there), 0).x;
   if (water_there == 0) {
-    q = 0.0;
-  } else {
-    q = float(water_there) * texture(scalarField, (toScalarTexcoords * vec4(there, 0.0, 1.0)).xy).x;
-  }
+    there = waterBoundary(vec2(here), lambda, dir);
+  } 
+  q = texture(scalarField, (toScalarTexcoords * vec4(there, 0.0, 1.0)).xy).x;
 }
 `;
 

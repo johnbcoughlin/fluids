@@ -64,7 +64,7 @@ export class GPUFluid {
 
   constructor(gl: GL) {
     this.gl = gl;
-    const n = 128;
+    const n = 64;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -75,6 +75,8 @@ export class GPUFluid {
   }
 
   initialize(gl: GL) {
+    const multigridWidth = this.nx + Math.floor(Math.log2(this.nx)) * 2;
+    const multigridHeight = this.ny + Math.floor(Math.log2(this.ny)) * 2;
     this.waterMask = new OnePhaseRenderTarget(gl, "water", gl.TEXTURE0, 0, () => {
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, this.nx, this.ny, 0, gl.RED_INTEGER, gl.INT,
           new Int32Array(waterMask(this.nx, this.ny)));
@@ -126,7 +128,8 @@ export class GPUFluid {
       for (let j = 0; j < this.ny + 1; j++) {
         for (let i = 0; i < this.nx; i++) {
           if (i === this.nx / 2 && j > this.ny / 3 && j < 2 * this.ny / 3) {
-            data.push(-j);
+            // data.push(-j);
+            data.push(0.0);
           } else {
             data.push(0.0);
           }
@@ -152,7 +155,8 @@ export class GPUFluid {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     }, this.nx, this.ny);
 
-    this.multigrid = new TwoPhaseRenderTarget(gl, "multigrid", gl.TEXTURE7, 7, () => {
+    this.multigrid = new TwoPhaseRenderTarget(gl, "multigrid", gl.TEXTURE7, 7,
+        () => {
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F,
               this.nx + Math.floor(Math.log2(this.nx)) * 2,
               this.ny + Math.floor(Math.log2(this.ny)) * 2,
@@ -162,7 +166,11 @@ export class GPUFluid {
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         },
         this.nx + Math.floor(Math.log2(this.nx)) * 2,
-        this.ny + Math.floor(Math.log2(this.ny)) * 2
+        this.ny + Math.floor(Math.log2(this.ny)) * 2,
+        (texture) => {
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.R32F, 0, 0, multigridWidth, multigridHeight, 0);
+        }
     );
 
     this.residualsMultigrid = new OnePhaseRenderTarget(gl, "residualsMultigrid", gl.TEXTURE8, 8, () => {
@@ -273,6 +281,32 @@ export class GPUFluid {
         this.dye, this.corrections, this.correctionsMultigrid, this.divergence, this.rightHandSideMultigrid);
   }
 
+  errorCorrect(level: number) {
+    console.log("smoothing");
+    this.errorCorrectionJacobiRender.render(level);
+    this.canvasRender.render();
+  }
+
+  computeResiduals(level: number) {
+    this.pressureResidualsRender.render(level);
+    this.canvasRender.render();
+  }
+
+  restrictFrom(fromLevel: number) {
+    this.restrictResidualsRender.restrictFrom(fromLevel);
+    this.canvasRender.render();
+  }
+
+  interpolateFrom(fromLevel: number) {
+    this.interpolatePressureRender.interpolateTo(fromLevel - 1);
+    this.canvasRender.render();
+  }
+
+  correct(level: number) {
+    this.addCorrectionRender.render(level);
+    this.canvasRender.render();
+  }
+
   render() {
     console.log("frame");
     this.bodyForcesRender.render();
@@ -281,34 +315,27 @@ export class GPUFluid {
     this.advectionRender.advectY();
     this.divergenceRender.render();
 
-    for (let i = 0; i < 400; i++) {
-      this.errorCorrectionJacobiRender.render(0);
-      this.pressureResidualsRender.render(0);
-      // this.restrictResidualsRender.restrictFrom(0);
-      // this.errorCorrectionJacobiRender.render(1);
-      // this.interpolatePressureRender.interpolateTo(0);
-      // this.addCorrectionRender.render(0);
-    }
-
     // this.solvePressure();
-    this.applyPressureCorrectionXRender.render();
-    this.applyPressureCorrectionYRender.render();
     //
-    this.divergenceRender.render();
-    this.canvasRender.render();
-
-    this.advectionRender.advectDye();
+    // this.applyPressureCorrectionXRender.render();
+    // this.applyPressureCorrectionYRender.render();
+    //
+    // this.divergenceRender.render();
+    // this.canvasRender.render();
+    //
+    // this.advectionRender.advectDye();
     // requestAnimationFrame(() => this.render());
-    // setTimeout(() => this.render(), 1000);
+    // setTimeout(() => this.render(), 300);
   }
 
   solvePressure() {
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 10; i++) {
       // level 1
       this.errorCorrectionJacobiRender.render(0);
       this.errorCorrectionJacobiRender.render(0);
       this.pressureResidualsRender.render(0);
       this.restrictResidualsRender.restrictFrom(0);
+
       this.errorCorrectionJacobiRender.render(1);
       this.errorCorrectionJacobiRender.render(1);
 
@@ -340,9 +367,9 @@ export class GPUFluid {
       // this.addCorrectionRender.render(2);
       // this.errorCorrectionJacobiRender.render(2);
 
-      this.interpolatePressureRender.interpolateTo(1);
-      this.addCorrectionRender.render(1);
-      this.errorCorrectionJacobiRender.render(1);
+      // this.interpolatePressureRender.interpolateTo(1);
+      // this.addCorrectionRender.render(1);
+      // this.errorCorrectionJacobiRender.render(1);
 
       // level 1
       this.interpolatePressureRender.interpolateTo(0);

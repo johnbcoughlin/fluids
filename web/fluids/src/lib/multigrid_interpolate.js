@@ -64,48 +64,52 @@ export class MultigridInterpolatePressure {
     let targetLevel = 0;
     let targetLevelNx = this.nx;
     let targetLevelNy = this.ny;
-    let offset = 0;
-    this.offsets[0] = offset;
+    let targetOffset = 0;
+    let sourceOffset = 0;
+    this.offsets[0] = targetOffset;
 
     while (targetLevelNx > 2 && targetLevelNy > 2) {
       const levelCoords = [];
+      if (targetLevel > 0) {
+        sourceOffset += Math.max(Math.floor(targetLevelNx), Math.floor(targetLevelNy)) + 1;
+      }
       if (targetLevel > 1) {
-        offset += Math.max(Math.floor(targetLevelNx * 2), Math.floor(targetLevelNy * 2)) + 1;
+        targetOffset += Math.max(Math.floor(targetLevelNx * 2), Math.floor(targetLevelNy * 2)) + 1;
       }
       for (let i = 0; i < targetLevelNx; i++) {
         for (let j = 0; j < targetLevelNy; j++) {
-          const vertex = [i + offset, j + offset];
+          const vertex = [i + targetOffset, j + targetOffset];
           if (i % 2 === 0 && j % 2 === 0) {
             vertex.push(
-                i / 2 + offset, j / 2, 1,
+                i / 2 + sourceOffset, j / 2 + sourceOffset, 1,
                 0, 0, 0,
                 0, 0, 0,
                 0, 0, 0);
           } else if (i % 2 === 0 && j % 2 === 1) {
             vertex.push(
-                i / 2 + offset, Math.floor(j / 2) + offset, 0.5,
-                i / 2 + offset, Math.floor(j / 2) + 1 + offset, 0.5,
+                i / 2 + sourceOffset, Math.floor(j / 2) + sourceOffset, 0.5,
+                i / 2 + sourceOffset, Math.floor(j / 2) + 1 + sourceOffset, 0.5,
                 0, 0, 0,
                 0, 0, 0);
           } else if (i % 2 === 1 && j % 2 === 0) {
             vertex.push(
-                Math.floor(i / 2) + offset, j / 2 + offset, 0.5,
+                Math.floor(i / 2) + sourceOffset, j / 2 + sourceOffset, 0.5,
                 0, 0, 0,
-                Math.floor(i / 2) + 1 + offset, j / 2 + offset, 0.5,
+                Math.floor(i / 2) + 1 + sourceOffset, j / 2 + sourceOffset, 0.5,
                 0, 0, 0);
           } else {
             vertex.push(
-                Math.floor(i / 2) + offset, Math.floor(j / 2) + offset, 0.25,
-                Math.floor(i / 2) + offset, Math.floor(j / 2) + 1 + offset, 0.25,
-                Math.floor(i / 2) + 1 + offset, Math.floor(j / 2) + offset, 0.25,
-                Math.floor(i / 2) + 1 + offset, Math.floor(j / 2) + 1 + offset, 0.25);
+                Math.floor(i / 2) + sourceOffset, Math.floor(j / 2) + sourceOffset, 0.25,
+                Math.floor(i / 2) + sourceOffset, Math.floor(j / 2) + 1 + sourceOffset, 0.25,
+                Math.floor(i / 2) + 1 + sourceOffset, Math.floor(j / 2) + sourceOffset, 0.25,
+                Math.floor(i / 2) + 1 + sourceOffset, Math.floor(j / 2) + 1 + sourceOffset, 0.25);
           }
           levelCoords.push(vertex);
         }
       }
 
       this.coords[targetLevel] = levelCoords;
-      this.offsets[targetLevel] = offset;
+      this.offsets[targetLevel] = targetOffset;
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

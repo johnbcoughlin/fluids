@@ -17,6 +17,7 @@ export class TwoPhaseRenderTarget implements RenderTarget {
   textureFactory: () => void;
   width: number;
   height: number;
+  copySourceToTarget: (texture: any) => void;
 
   framebufferA: GLFramebuffer;
   textureA: GLTexture;
@@ -34,7 +35,8 @@ export class TwoPhaseRenderTarget implements RenderTarget {
               textureUnitInt: number,
               textureFactory: () => void,
               width: number,
-              height: number) {
+              height: number,
+              copySourceToTarget: (texture: any) => void) {
     this.gl = gl;
     this.name = name;
     this.textureUnit = textureUnit;
@@ -42,6 +44,7 @@ export class TwoPhaseRenderTarget implements RenderTarget {
     this.textureFactory = textureFactory;
     this.width = width;
     this.height = height;
+    this.copySourceToTarget = copySourceToTarget == null ? () => {} : copySourceToTarget;
 
     this.initialize(gl);
   }
@@ -94,6 +97,7 @@ export class TwoPhaseRenderTarget implements RenderTarget {
   swap() {
     this.swapped = true;
     this.currentRenderTarget = this.currentRenderTarget === "A" ? "B" : "A";
+    this.copySourceToTarget(this.usableTexture === "A" ? this.textureA : this.textureB);
     this.usableTexture = this.usableTexture === "A" ? "B" : "A";
   }
 }

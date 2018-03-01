@@ -7,7 +7,6 @@ import type {GL, GLLocation, GLProgram} from "./gl_types";
 import type {Pressure, Residual, RightHandSide, Solution} from "./types";
 import type {RenderTarget} from "./render_targets";
 import {Multigrid, PressureMultigrid} from "./types";
-import {flatten} from "./utils";
 
 export class ErrorCorrectionJacobiRender extends MultigridRender {
   dx: number;
@@ -20,7 +19,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
   pressure: Pressure;
   divergence: Divergence;
   multigrid: PressureMultigrid;
-  residualsMultigrid: Residual & Multigrid;
   rightHandSideMultigrid: RightHandSide & Multigrid;
 
   waterMaskLocation: GLLocation;
@@ -41,7 +39,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
               pressure: Pressure,
               divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
-              residualsMultigrid: TwoPhaseRenderTarget,
               rightHandSideMultigrid: TwoPhaseRenderTarget) {
     super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
     this.dx = dx;
@@ -54,7 +51,6 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     this.pressure = pressure;
     this.divergence = divergence;
     this.multigrid = multigrid;
-    this.residualsMultigrid = residualsMultigrid;
 
     this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
@@ -95,6 +91,7 @@ export class ErrorCorrectionJacobiRender extends MultigridRender {
     gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * Math.pow(2, level));
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.airDistance.useAsTexture(this.airDistanceLocation);
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
 
     if (level === 0) {
       gl.uniformMatrix4fv(
@@ -148,6 +145,11 @@ void main() {
     return;
   }
   
+  int solid_left = texelFetch(solidDistance, here, 0).x < 1.0 ? 1 : 0;
+  int solid_right = texelFetch(solidDistance, here, 0).y < 1.0 ? 1 : 0;
+  int solid_down = texelFetch(solidDistance, here, 0).z < 1.0 ? 1 : 0;
+  int solid_up = texelFetch(solidDistance, here, 0).w < 1.0 ? 1 : 0;
+  
   int water_left = texelFetch(waterMask, here - ivec2(1, 0), 0).x;
   int water_right = texelFetch(waterMask, here + ivec2(1, 0), 0).x;
   int water_down = texelFetch(waterMask, here - ivec2(0, 1), 0).x;
@@ -169,8 +171,11 @@ void main() {
   float rightHandSideHere = texelFetch(rightHandSide, ihere, 0).x;
   
   float norm = dt / (dx * dx);
+  // float norm = dt;
+  // int neighbors = 4 - solid_left - solid_right - solid_down - solid_up;
   float d = float(water_left + water_right + water_up + water_down + 
   air_left + air_right + air_up + air_down) * norm;
+  // float d = float(neighbors) * norm;
   
   float z = (1.0 / d) * (rightHandSideHere +
       (float(water_left) * solution_left + 
@@ -180,7 +185,6 @@ void main() {
       
   float omega = 0.8;
   new_solution = solution_here + omega * (z - solution_here);
-  // new_solution = 1.0 - solution_here;
 }
 `;
 

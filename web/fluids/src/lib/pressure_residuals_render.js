@@ -18,11 +18,13 @@ export class ResidualsRender extends MultigridRender {
 
   waterMask: FinestGrid;
   airDistance: FinestGrid;
+  solidDistance: FinestGrid;
   residuals: Residual & FinestGrid;
   rightHandSideMultigrid: RightHandSide & Multigrid;
 
   waterMaskLocation: GLLocation;
   airDistanceLocation: GLLocation;
+  solidDistanceLocation: GLLocation;
   solutionLocation: GLLocation;
   residualsLocation: GLLocation;
 
@@ -34,6 +36,7 @@ export class ResidualsRender extends MultigridRender {
               dt: number,
               waterMask: FinestGrid,
               airDistance: TwoPhaseRenderTarget,
+              solidDistance: FinestGrid,
               pressure: Pressure,
               divergence: TwoPhaseRenderTarget,
               multigrid: TwoPhaseRenderTarget,
@@ -50,6 +53,7 @@ export class ResidualsRender extends MultigridRender {
     this.residualsMultigrid = residualsMultigrid;
     this.waterMask = waterMask;
     this.airDistance = airDistance;
+    this.solidDistance = solidDistance;
     this.residuals = residuals;
     this.rightHandSideMultigrid = rightHandSideMultigrid;
     this.initialize(gl);
@@ -62,6 +66,7 @@ export class ResidualsRender extends MultigridRender {
   initializeUniforms(gl: GL, program: GLProgram) {
     this.waterMaskLocation = gl.getUniformLocation(program, "waterMask");
     this.airDistanceLocation = gl.getUniformLocation(program, "airDistance");
+    this.solidDistanceLocation = gl.getUniformLocation(program, "solidDistance");
     this.residualsLocation = gl.getUniformLocation(program, "residuals");
     this.solutionLocation = gl.getUniformLocation(program, "solution");
 
@@ -89,6 +94,7 @@ export class ResidualsRender extends MultigridRender {
     this.gl.useProgram(this.program);
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.airDistance.useAsTexture(this.airDistanceLocation);
+    this.solidDistance.useAsTexture(this.solidDistanceLocation);
     gl.uniform1f(gl.getUniformLocation(program, "dx"), this.dx * Math.pow(2, level));
     gl.uniform1f(gl.getUniformLocation(program, "dy"), this.dy * Math.pow(2, level));
     if (level === 0) {
@@ -129,6 +135,7 @@ uniform float dy;
 uniform float dt;
 uniform mediump isampler2D waterMask;
 uniform mediump sampler2D airDistance;
+uniform mediump sampler2D solidDistance;
 uniform sampler2D residuals;
 uniform sampler2D solution;
 
@@ -145,10 +152,16 @@ void main() {
     return;
   }
   
+  int solid_left = texelFetch(solidDistance, here, 0).x < 1.0 ? 1 : 0;
+  int solid_right = texelFetch(solidDistance, here, 0).y < 1.0 ? 1 : 0;
+  int solid_down = texelFetch(solidDistance, here, 0).z < 1.0 ? 1 : 0;
+  int solid_up = texelFetch(solidDistance, here, 0).w < 1.0 ? 1 : 0;
+  
   int water_left = bitmask_left(waterMask, here) ? 1 : 0;
   int water_right = bitmask_right(waterMask, here) ? 1 : 0;
   int water_down = bitmask_down(waterMask, here) ? 1 : 0;
   int water_up = bitmask_up(waterMask, here) ? 1 : 0;
+  
   int air_left = texelFetch(airDistance, here, 0).x < 1.0 ? 1 : 0;
   int air_right = texelFetch(airDistance, here, 0).y < 1.0 ? 1 : 0;
   int air_down = texelFetch(airDistance, here, 0).z < 1.0 ? 1 : 0;
@@ -164,8 +177,7 @@ void main() {
   float residual_here = texelFetch(residuals, here, 0).x;
   
   float norm = dt / (dx * dx);
-  int neighbors = water_left + water_right + water_up + water_down + 
-  air_left + air_right + air_up + air_down;
+  int neighbors = 4 - solid_left - solid_right - solid_down - solid_up;
   
   float Lp = 
       float(neighbors) * norm * solution_here -

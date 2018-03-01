@@ -20,6 +20,7 @@ import {
   Multigrid,
   Pressure
 } from "./types";
+import {ZeroOutRender} from "./zero_out_render";
 
 export class GPUFluid {
   // WebGL2 Context
@@ -60,11 +61,12 @@ export class GPUFluid {
   applyPressureCorrectionYRender: ApplyPressureCorrectionY;
   applyPressureCorrectionXRender: ApplyPressureCorrectionX;
   advectionRender: AdvectionRender;
+  zeroOutRender: ZeroOutRender;
   canvasRender: CanvasRender;
 
   constructor(gl: GL) {
     this.gl = gl;
-    const n = 64;
+    const n = 512;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -128,8 +130,8 @@ export class GPUFluid {
       for (let j = 0; j < this.ny + 1; j++) {
         for (let i = 0; i < this.nx; i++) {
           if (i === this.nx / 2 && j > this.ny / 3 && j < 2 * this.ny / 3) {
-            // data.push(-j);
-            data.push(0.0);
+            data.push(-j);
+            // data.push(0.0);
           } else {
             data.push(0.0);
           }
@@ -249,7 +251,7 @@ export class GPUFluid {
         this.velocityX, this.velocityY, this.waterMask, this.solidDistance, this.airDistance);
 
     this.pressureResidualsRender = new ResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.waterMask, this.airDistance,
+        this.dt, this.waterMask, this.airDistance, this.solidDistance,
         this.pressure, this.divergence,
         this.multigrid, this.residualsMultigrid,
         this.residuals, this.rightHandSideMultigrid);
@@ -261,7 +263,7 @@ export class GPUFluid {
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airDistance, this.solidDistance,
-        this.pressure, this.divergence, this.multigrid, this.residualsMultigrid, this.rightHandSideMultigrid);
+        this.pressure, this.divergence, this.multigrid, this.rightHandSideMultigrid);
 
     this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny,
         this.pressure, this.corrections,
@@ -274,6 +276,8 @@ export class GPUFluid {
 
     this.advectionRender = new AdvectionRender(this.gl, this.nx, this.dx, this.ny, this.dy, this.dt,
         this.velocityX, this.velocityY, this.dye, this.waterMask);
+
+    this.zeroOutRender = new ZeroOutRender(this.gl, this.nx, this.ny, this.pressure, this.multigrid);
 
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,
@@ -315,72 +319,109 @@ export class GPUFluid {
     this.advectionRender.advectY();
     this.divergenceRender.render();
 
-    // this.solvePressure();
-    //
-    // this.applyPressureCorrectionXRender.render();
-    // this.applyPressureCorrectionYRender.render();
-    //
-    // this.divergenceRender.render();
-    // this.canvasRender.render();
-    //
-    // this.advectionRender.advectDye();
-    // requestAnimationFrame(() => this.render());
+    this.solvePressure();
+
+    this.applyPressureCorrectionXRender.render();
+    this.applyPressureCorrectionYRender.render();
+
+    this.divergenceRender.render();
+    this.pressureResidualsRender.render(0);
+    this.canvasRender.render();
+
+    this.advectionRender.advectDye();
+    requestAnimationFrame(() => this.render());
     // setTimeout(() => this.render(), 300);
+  }
+
+  solveLevel(level: number) {
+    if (level > 0) {
+      this.zeroOutRender.render(level);
+    }
+    if (level >= 4) {
+      for (let i = 0; i < 10; i++) {
+        this.errorCorrectionJacobiRender.render(level);
+      }
+    } else {
+      this.errorCorrectionJacobiRender.render(level);
+      this.errorCorrectionJacobiRender.render(level);
+      this.pressureResidualsRender.render(level);
+      this.restrictResidualsRender.restrictFrom(level);
+      this.solveLevel(level + 1);
+      this.addCorrectionRender.render(level);
+      this.errorCorrectionJacobiRender.render(level);
+    }
+    if (level > 0) {
+      this.interpolatePressureRender.interpolateTo(level - 1);
+    }
+    this.canvasRender.render();
   }
 
   solvePressure() {
     for (let i = 0; i < 10; i++) {
+      this.solveLevel(0);
+    }
+  }
+
+  solvePressure2() {
+    for (let i = 0; i < 6; i++) {
       // level 1
       this.errorCorrectionJacobiRender.render(0);
       this.errorCorrectionJacobiRender.render(0);
+
+      // level 1
       this.pressureResidualsRender.render(0);
       this.restrictResidualsRender.restrictFrom(0);
-
+      this.zeroOutRender.render(1);
       this.errorCorrectionJacobiRender.render(1);
       this.errorCorrectionJacobiRender.render(1);
 
       // level 2
-      // this.pressureResidualsRender.render(1);
-      // this.restrictResidualsRender.restrictFrom(1);
-      // this.errorCorrectionJacobiRender.render(2);
-      // this.errorCorrectionJacobiRender.render(2);
+      this.pressureResidualsRender.render(1);
+      this.restrictResidualsRender.restrictFrom(1);
+      this.zeroOutRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
 
       // level 3
-      // this.pressureResidualsRender.render(2);
-      // this.restrictResidualsRender.restrictFrom(2);
-      // this.errorCorrectionJacobiRender.render(3);
-      // this.errorCorrectionJacobiRender.render(3);
+      this.pressureResidualsRender.render(2);
+      this.restrictResidualsRender.restrictFrom(2);
+      this.zeroOutRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
 
       // level 4
-      // this.pressureResidualsRender.render(3);
-      // this.restrictResidualsRender.restrictFrom(3);
-      // for (let i = 0; i < 10; i++) {
-      //   this.errorCorrectionJacobiRender.render(4);
-      //   this.errorCorrectionJacobiRender.render(4);
-      // }
+      this.pressureResidualsRender.render(3);
+      this.restrictResidualsRender.restrictFrom(3);
+      this.zeroOutRender.render(4);
+      for (let i = 0; i < 10; i++) {
+        this.errorCorrectionJacobiRender.render(4);
+        this.errorCorrectionJacobiRender.render(4);
+      }
+      //
+      this.interpolatePressureRender.interpolateTo(3);
+      this.addCorrectionRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
+      this.errorCorrectionJacobiRender.render(3);
 
-      // this.interpolatePressureRender.interpolateTo(3);
-      // this.addCorrectionRender.render(3);
-      // this.errorCorrectionJacobiRender.render(3);
+      this.interpolatePressureRender.interpolateTo(2);
+      this.addCorrectionRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
+      this.errorCorrectionJacobiRender.render(2);
 
-      // this.interpolatePressureRender.interpolateTo(2);
-      // this.addCorrectionRender.render(2);
-      // this.errorCorrectionJacobiRender.render(2);
-
-      // this.interpolatePressureRender.interpolateTo(1);
-      // this.addCorrectionRender.render(1);
-      // this.errorCorrectionJacobiRender.render(1);
+      this.interpolatePressureRender.interpolateTo(1);
+      this.addCorrectionRender.render(1);
+      this.errorCorrectionJacobiRender.render(1);
+      this.errorCorrectionJacobiRender.render(1);
 
       // level 1
       this.interpolatePressureRender.interpolateTo(0);
       this.addCorrectionRender.render(0);
       this.errorCorrectionJacobiRender.render(0);
-    }
-  }
-
-  solvePressure2() {
-    for (let i = 0; i < 101; i++) {
       this.errorCorrectionJacobiRender.render(0);
     }
+    this.errorCorrectionJacobiRender.render(0);
+    this.errorCorrectionJacobiRender.render(0);
+    this.errorCorrectionJacobiRender.render(0);
+    this.pressureResidualsRender.render(0);
   }
 }

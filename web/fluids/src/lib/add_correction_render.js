@@ -91,7 +91,7 @@ void main() {
   
   ivec2 here = ivec2(a_gridcoords.xy);
   
-  value = texelFetch(solution, here, 0).x + texelFetch(correction, here, 0).x / 4.0;
+  value = texelFetch(solution, here, 0).x + texelFetch(correction, here, 0).x;
 }
 `;
 

@@ -18,12 +18,14 @@ export class MultigridRestrictionRender {
   program: GLProgram;
   vaos: Array<GLVAO>;
   coords: Array<Array<Array<number>>>;
-  offsets: Array<number>;
+  destinationOffsets: Array<number>;
+  sourceOffsets: Array<number>;
 
   sourceLocation: GLLocation;
   waterMaskLocation: GLLocation;
   destinationLevelLocation: GLLocation;
-  offsetLocation: GLLocation;
+  destinationOffset: GLLocation;
+  sourceOffset: GLLocation;
 
   constructor(gl: GL,
               nx: number,
@@ -51,7 +53,8 @@ export class MultigridRestrictionRender {
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
     this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.destinationLevelLocation = gl.getUniformLocation(this.program, "destinationLevel");
-    this.offsetLocation = gl.getUniformLocation(this.program, "offset");
+    this.destinationOffset = gl.getUniformLocation(this.program, "destinationOffset");
+    this.sourceOffset = gl.getUniformLocation(this.program, "sourceOffset");
 
     this.setupPositions(gl, this.program);
     gl.uniformMatrix4fv(
@@ -67,7 +70,8 @@ export class MultigridRestrictionRender {
     let sourceOffset = 0;
     this.coords = [];
     this.vaos = [];
-    this.offsets = [];
+    this.destinationOffsets = [];
+    this.sourceOffsets = [];
 
     while (sourceLevelNx > 2 && sourceLevelNy > 2) {
       const levelCoords = [];
@@ -96,7 +100,8 @@ export class MultigridRestrictionRender {
         }
       }
       this.coords[sourceLevel] = levelCoords;
-      this.offsets[sourceLevel] = offset;
+      this.destinationOffsets[sourceLevel] = offset;
+      this.sourceOffsets[sourceLevel] = sourceOffset;
 
       const vao = gl.createVertexArray();
       gl.bindVertexArray(vao);
@@ -165,7 +170,8 @@ export class MultigridRestrictionRender {
 
     this.waterMask.useAsTexture(this.waterMaskLocation);
     this.gl.uniform1i(this.destinationLevelLocation, level + 1);
-    this.gl.uniform1i(this.offsetLocation, this.offsets[level]);
+    this.gl.uniform1i(this.destinationOffset, this.destinationOffsets[level]);
+    this.gl.uniform1i(this.sourceOffset, this.sourceOffsets[level]);
     this.gl.uniformMatrix4fv(
         this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
         false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
@@ -200,7 +206,8 @@ in vec4 contributor9;
 
 uniform mediump isampler2D waterMask;
 uniform int destinationLevel;
-uniform int offset;
+uniform int destinationOffset;
+uniform int sourceOffset;
 
 // we have to convert the afterGridcoords to clip space
 uniform mat4 afterGridToClipcoords;
@@ -210,27 +217,93 @@ uniform sampler2D source;
 // the value we pass directly to the fragment shader
 out float value;
 
+bool waterAtContributor(vec4 contributor) {
+  ivec2 finestCoords = (ivec2(contributor.xy) - ivec2(sourceOffset, sourceOffset)) * (1 << (destinationLevel - 1));
+  return texelFetch(waterMask, finestCoords, 0).x == 1;
+}
+
 void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
   
-  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
+  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(destinationOffset, destinationOffset)) * (1 << destinationLevel);
   bool water_here = texelFetch(waterMask, here, 0).x == 1;
   if (!water_here) {
     value = 0.0;
     return;
   }
-
-  value = 
-      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
-      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
-      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
-      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z +
-      texelFetch(source, ivec2(contributor5.xy), 0).x * contributor5.z +
-      texelFetch(source, ivec2(contributor6.xy), 0).x * contributor6.z +
-      texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z +
-      texelFetch(source, ivec2(contributor8.xy), 0).x * contributor8.z +
-      texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
+  
+  bool lumping = false;
+  
+  float result = 0.0;
+  
+  float lumping1 = 0.0;
+  float lumping3 = 0.0;
+  float lumping7 = 0.0;
+  float lumping9 = 0.0;
+  
+  // do the corners
+  if (!lumping || waterAtContributor(contributor1)) {
+    result += texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z;
+  } else {
+    lumping1 = contributor1.z;
+  }
+  if (!lumping || waterAtContributor(contributor3)) {
+    result += texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z;
+  } else {
+    lumping3 = contributor3.z;
+  }
+  if (!lumping || waterAtContributor(contributor7)) {
+    result += texelFetch(source, ivec2(contributor7.xy), 0).x * contributor7.z;
+  } else {
+    lumping7 = contributor7.z;
+  }
+  if (!lumping || waterAtContributor(contributor9)) {
+    result += texelFetch(source, ivec2(contributor9.xy), 0).x * contributor9.z;
+  } else {
+    lumping9 = contributor9.z;
+  }
+  
+  float lumping2 = 0.0;
+  float lumping4 = 0.0;
+  float lumping6 = 0.0;
+  float lumping8 = 0.0;
+  
+  // do the edges
+  if (!lumping || waterAtContributor(contributor2)) {
+    result += texelFetch(source, ivec2(contributor2.xy), 0).x * (lumping1 + lumping3 + contributor2.z);
+    lumping1 = 0.0;
+    lumping3 = 0.0;
+  } else {
+    lumping2 = contributor2.z;
+  }
+  if (!lumping || waterAtContributor(contributor4)) {
+    result += texelFetch(source, ivec2(contributor4.xy), 0).x * (lumping1 + lumping7 + contributor4.z);
+    lumping1 = 0.0;
+    lumping7 = 0.0;
+  } else {
+    lumping4 = contributor4.z;
+  }
+  if (!lumping || waterAtContributor(contributor6)) {
+    result += texelFetch(source, ivec2(contributor6.xy), 0).x * (lumping3 + lumping9 + contributor6.z);
+    lumping3 = 0.0;
+    lumping9 = 0.0;
+  } else {
+    lumping6 = contributor6.z;
+  }
+  if (!lumping || waterAtContributor(contributor8)) {
+    result += texelFetch(source, ivec2(contributor8.xy), 0).x * (lumping7 + lumping9 + contributor8.z);
+    lumping7 = 0.0;
+    lumping9 = 0.0;
+  } else {
+    lumping8 = contributor8.z;
+  }
+  
+  // finally do the center
+  result += texelFetch(source, ivec2(contributor5.xy), 0).x * (contributor5.z + lumping1 + lumping2 +
+  lumping3 + lumping4 + lumping6 + lumping7 + lumping8 + lumping9);
+  
+  value = result;
 }
 `;
 

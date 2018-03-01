@@ -132,26 +132,26 @@ export class CanvasRender {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 
     renderToTopLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.pressure.useAsTexture(this.uniformTextureLocation);
+    this.gl.uniform1f(this.normalizerLocation, 10000.0);
+    this.dye.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToTopRight(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.residuals.useAsTexture(this.uniformTextureLocation);
+    this.divergence.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomLeft(this.gl);
-    this.gl.uniform1f(this.normalizerLocation, 10.0);
+    this.gl.uniform1f(this.normalizerLocation, 2.0);
     this.gl.uniformMatrix4fv(
         this.gl.getUniformLocation(this.program, "toGridTexcoords"),
         false, toGridTexcoords(this.multigrid.width, this.multigrid.height));
-    this.multigrid.useAsTexture(this.uniformTextureLocation);
+    this.velocityX.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
     renderToBottomRight(this.gl);
     this.gl.uniform1f(this.normalizerLocation, 1.0);
-    this.residualsMultigrid.useAsTexture(this.uniformTextureLocation);
+    this.velocityY.useAsTexture(this.uniformTextureLocation);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 
@@ -209,15 +209,13 @@ void main() {
 
   float p = texelFetch(u_texture, here, 0).x * normalizer;
   
-  // if (!water && !air) {
-  //   outColor = vec4(0.2, 0.2, 0.2, 1.0);
-  // } else if (air) {
-  //   outColor = vec4(0.90, 0.90, 0.97, 1.0);
-  // } else 
+  if (!water && !air) {
+    outColor = vec4(0.2, 0.2, 0.2, 1.0);
+  } else if (air) {
+    outColor = vec4(0.90, 0.90, 0.97, 1.0);
+  } else 
   if (p > 0.0) {
     outColor = vec4(0.0, 0.0, p, 1.0);
-  } else if (p < -0.95) {
-    outColor = vec4(0.0, abs(p), 0.0, 1.0);
   } else if (p != 0.0) {
     outColor = vec4(abs(p), 0.0, 0.0, 1.0);
   } else {

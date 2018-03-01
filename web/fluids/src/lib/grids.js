@@ -65,19 +65,19 @@ export const gridPointVertices = (nx: number, ny: number): Array<Array<number>> 
 };
 
 const airBorder = (ny) => {
-  return ny - Math.floor(ny / 4) - 0.5;
+  return ny - Math.floor(ny / 12) - 0.5;
 };
 
 const solidBorderLeft = (nx) => {
-  return Math.floor(nx / 4) - 0.5;
+  return Math.floor(nx / 12) - 0.5;
 };
 
 const solidBorderRight = (nx: number): number => {
-  return nx - Math.floor(nx / 4) - 0.5;
+  return nx - Math.floor(nx / 12) - 0.5;
 };
 
 const solidBorderBottom = (ny: number): number => {
-  return Math.floor(ny / 4) - 0.5;
+  return Math.floor(ny / 12) - 0.5;
 };
 
 export const waterMask = (nx: number, ny: number): Array<number> => {

@@ -12,19 +12,23 @@ class App extends Component {
     return (
         <div className="App">
           <div>
-            <canvas width={800} height={800}
+            <canvas width={700} height={700}
                     ref={(canvas) => {
                       this.initializeCanvas(canvas);
                     }}/>
           </div>
+          <button onClick={() => this.fluid.render()}>Go</button>
+          <button onClick={() => this.fluid.doCycle()}>Cycle</button>
           {
-            [0, 1, 2, 3].map((level) => (
-                <div>
+            [0, 1, 2, 3, 4].map((level) => (
+                <div key={level}>
                   <span>Level {level}</span>
                   <button onClick={() => this.fluid.errorCorrect(level)}>Smooth</button>
                   <button onClick={() => this.fluid.computeResiduals(level)}>Residuals</button>
                   <button onClick={() => this.fluid.restrictFrom(level)}>Restrict</button>
-                  <button onClick={() => this.fluid.interpolateFrom(level)}>Interpolate</button>
+                  {
+                    level > 0 ? <button onClick={() => this.fluid.interpolateFrom(level)}>Interpolate</button> : null
+                  }
                   <button onClick={() => this.fluid.correct(level)}>Correct</button>
                 </div>
             ))

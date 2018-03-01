@@ -20,12 +20,14 @@ export class MultigridInterpolatePressure {
   program: GLProgram;
   vaos: Array<GLVAO>;
   coords: Array<Array<Array<number>>>;
-  offsets: Array<number>;
+  sourceOffsets: Array<number>;
+  destinationOffsets: Array<number>;
 
   sourceLocation: GLLocation;
   waterMaskLocation: GLLocation;
   destinationLevelLocation: GLLocation;
-  offsetLocation: GLLocation;
+  sourceOffsetLocation: GLLocation;
+  destinationOffsetLocation: GLLocation;
 
   constructor(gl: GL,
               nx: number,
@@ -43,7 +45,8 @@ export class MultigridInterpolatePressure {
     this.waterMask = waterMask;
     this.coords = [];
     this.vaos = [];
-    this.offsets = [];
+    this.sourceOffsets = [];
+    this.destinationOffsets = [];
     this.initialize(gl);
   }
 
@@ -55,7 +58,8 @@ export class MultigridInterpolatePressure {
     this.sourceLocation = gl.getUniformLocation(this.program, "source");
     this.waterMaskLocation = gl.getUniformLocation(this.program, "waterMask");
     this.destinationLevelLocation = gl.getUniformLocation(this.program, "destinationLevel");
-    this.offsetLocation = gl.getUniformLocation(this.program, "offset");
+    this.sourceOffsetLocation = gl.getUniformLocation(this.program, "sourceOffset");
+    this.destinationOffsetLocation = gl.getUniformLocation(this.program, "destinationOffset");
 
     this.setupPositions(gl, this.program);
   }
@@ -66,7 +70,8 @@ export class MultigridInterpolatePressure {
     let targetLevelNy = this.ny;
     let targetOffset = 0;
     let sourceOffset = 0;
-    this.offsets[0] = targetOffset;
+    this.destinationOffsets[0] = targetOffset;
+    this.sourceOffsets[0] = sourceOffset;
 
     while (targetLevelNx > 2 && targetLevelNy > 2) {
       const levelCoords = [];
@@ -109,7 +114,8 @@ export class MultigridInterpolatePressure {
       }
 
       this.coords[targetLevel] = levelCoords;
-      this.offsets[targetLevel] = targetOffset;
+      this.sourceOffsets[targetLevel] = sourceOffset;
+      this.destinationOffsets[targetLevel] = targetOffset;
 
       const buffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -158,7 +164,8 @@ export class MultigridInterpolatePressure {
     this.gl.useProgram(this.program);
     // prepare to use the vertices referring to coordinates in the target level
     this.gl.uniform1i(this.destinationLevelLocation, level);
-    this.gl.uniform1i(this.offsetLocation, this.offsets[level]);
+    this.gl.uniform1i(this.sourceOffsetLocation, this.sourceOffsets[level]);
+    this.gl.uniform1i(this.destinationOffsetLocation, this.destinationOffsets[level]);
 
     this.multigrid.useAsTexture(this.sourceLocation);
     if (level === 0) {
@@ -197,27 +204,61 @@ in vec4 contributor4;
 uniform mat4 afterGridToClipcoords;
 uniform mediump isampler2D waterMask;
 uniform int destinationLevel;
-uniform int offset;
+uniform int sourceOffset;
+uniform int destinationOffset;
 
 uniform sampler2D source;
 
 out float value;
 
+bool waterAtContributor(vec4 contributor) {
+  ivec2 finestCoords = (ivec2(contributor.xy) - ivec2(sourceOffset, sourceOffset)) * (1 << (destinationLevel + 1));
+  return texelFetch(waterMask, finestCoords, 0).x == 1;
+}
+
 void main() {
   gl_Position = afterGridToClipcoords * afterGridcoords;
   gl_PointSize = 1.0;
   
-  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(offset, offset)) * (1 << destinationLevel);
+  ivec2 here = (ivec2(afterGridcoords.xy) - ivec2(destinationOffset, destinationOffset)) * (1 << destinationLevel);
   bool water_here = texelFetch(waterMask, here, 0).x == 1;
   if (!water_here) {
     value = 0.0;
   }
   
-  value = 
-      texelFetch(source, ivec2(contributor1.xy), 0).x * contributor1.z +
-      texelFetch(source, ivec2(contributor2.xy), 0).x * contributor2.z +
-      texelFetch(source, ivec2(contributor3.xy), 0).x * contributor3.z +
-      texelFetch(source, ivec2(contributor4.xy), 0).x * contributor4.z;
+  float result = 0.0;
+  float lumping = 0.0;
+  float foo = 0.0;
+  if (waterAtContributor(contributor1)) {
+    result += texelFetch(source, ivec2(contributor1.xy), 0).x * (contributor1.z + lumping);
+    lumping = 0.0;
+  } else {
+    lumping += contributor1.z;
+    foo += contributor1.z;
+  }
+  if (waterAtContributor(contributor2)) {
+    result += texelFetch(source, ivec2(contributor2.xy), 0).x * (contributor2.z + lumping);
+    lumping = 0.0;
+  } else {
+    lumping += contributor2.z;
+    foo += contributor2.z;
+  }
+  if (waterAtContributor(contributor3)) {
+    result += texelFetch(source, ivec2(contributor3.xy), 0).x * (contributor3.z + lumping);
+    lumping = 0.0;
+  } else {
+    lumping += contributor3.z;
+    foo += contributor3.z;
+  }
+  if (waterAtContributor(contributor4)) {
+    result += texelFetch(source, ivec2(contributor4.xy), 0).x * (contributor4.z + lumping);
+    lumping = 0.0;
+  } else {
+    lumping += contributor4.z;
+    foo += contributor4.z;
+  }
+  
+  value = result;
 }
 `;
 

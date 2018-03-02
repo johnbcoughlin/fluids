@@ -66,7 +66,7 @@ export class GPUFluid {
 
   constructor(gl: GL) {
     this.gl = gl;
-    const n = 512;
+    const n = 256;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -337,7 +337,7 @@ export class GPUFluid {
     if (level > 0) {
       this.zeroOutRender.render(level);
     }
-    if (level >= 4) {
+    if (level >= Math.max(Math.log2(this.nx), Math.log2(this.ny)) - 4) {
       for (let i = 0; i < 10; i++) {
         this.errorCorrectionJacobiRender.render(level);
       }
@@ -353,75 +353,11 @@ export class GPUFluid {
     if (level > 0) {
       this.interpolatePressureRender.interpolateTo(level - 1);
     }
-    this.canvasRender.render();
   }
 
   solvePressure() {
     for (let i = 0; i < 10; i++) {
       this.solveLevel(0);
     }
-  }
-
-  solvePressure2() {
-    for (let i = 0; i < 6; i++) {
-      // level 1
-      this.errorCorrectionJacobiRender.render(0);
-      this.errorCorrectionJacobiRender.render(0);
-
-      // level 1
-      this.pressureResidualsRender.render(0);
-      this.restrictResidualsRender.restrictFrom(0);
-      this.zeroOutRender.render(1);
-      this.errorCorrectionJacobiRender.render(1);
-      this.errorCorrectionJacobiRender.render(1);
-
-      // level 2
-      this.pressureResidualsRender.render(1);
-      this.restrictResidualsRender.restrictFrom(1);
-      this.zeroOutRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
-
-      // level 3
-      this.pressureResidualsRender.render(2);
-      this.restrictResidualsRender.restrictFrom(2);
-      this.zeroOutRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
-
-      // level 4
-      this.pressureResidualsRender.render(3);
-      this.restrictResidualsRender.restrictFrom(3);
-      this.zeroOutRender.render(4);
-      for (let i = 0; i < 10; i++) {
-        this.errorCorrectionJacobiRender.render(4);
-        this.errorCorrectionJacobiRender.render(4);
-      }
-      //
-      this.interpolatePressureRender.interpolateTo(3);
-      this.addCorrectionRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
-      this.errorCorrectionJacobiRender.render(3);
-
-      this.interpolatePressureRender.interpolateTo(2);
-      this.addCorrectionRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
-      this.errorCorrectionJacobiRender.render(2);
-
-      this.interpolatePressureRender.interpolateTo(1);
-      this.addCorrectionRender.render(1);
-      this.errorCorrectionJacobiRender.render(1);
-      this.errorCorrectionJacobiRender.render(1);
-
-      // level 1
-      this.interpolatePressureRender.interpolateTo(0);
-      this.addCorrectionRender.render(0);
-      this.errorCorrectionJacobiRender.render(0);
-      this.errorCorrectionJacobiRender.render(0);
-    }
-    this.errorCorrectionJacobiRender.render(0);
-    this.errorCorrectionJacobiRender.render(0);
-    this.errorCorrectionJacobiRender.render(0);
-    this.pressureResidualsRender.render(0);
   }
 }

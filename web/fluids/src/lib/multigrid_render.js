@@ -56,6 +56,8 @@ export class MultigridRender {
       }
     }
 
+    this.initializeLevel0();
+
     let level = 1;
     let levelNx = Math.floor(this.nx / 2);
     let levelNy = Math.floor(this.ny / 2);
@@ -77,7 +79,10 @@ export class MultigridRender {
       levelNy = Math.floor(levelNy / 2);
       level += 1;
     }
-    console.log("everything else", this.coords);
+  }
+
+  initializeLevel0() {
+
   }
 
   initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {

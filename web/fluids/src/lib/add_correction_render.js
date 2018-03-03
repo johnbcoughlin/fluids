@@ -38,8 +38,30 @@ export class AddCorrectionRender extends MultigridRender {
     this.solutionLocation = gl.getUniformLocation(program, "solution");
   }
 
+  initializeLevel0() {
+    this.coords[0] = [
+        [0, 0],
+        [0, this.ny],
+        [this.nx, 0],
+
+        [0, this.ny],
+        [this.nx, this.ny],
+        [this.nx, 0]
+    ];
+  }
+
   initializeLevel(level: number, levelNx: number, levelNy: number, offset: number) {
-    // no-op
+    const coords = [
+        // lower left
+        [offset, offset],
+        [offset, offset + levelNy],
+        [offset + levelNx, offset],
+
+        [offset, offset + levelNy],
+        [offset + levelNx, offset + levelNy],
+        [offset + levelNx, offset]
+    ];
+    this.coords[level] = coords;
   }
 
   bindCoordinateArrays(gl: GL, program: GLProgram) {
@@ -80,38 +102,37 @@ export class AddCorrectionRender extends MultigridRender {
 
   doRender(level: number) {
     const gl = this.gl;
-    gl.drawArrays(gl.POINTS, 0, this.coords[level].length);
+    console.log(this.coords[level]);
+    gl.drawArrays(gl.TRIANGLES, 0, this.coords[level].length);
   }
 }
 
 const vertexShaderSource = `
 in vec4 a_gridcoords;
 
-uniform sampler2D solution;
-uniform sampler2D correction;
-
 uniform mat4 toGridClipcoords;
 
-out float value;
+out vec4 v_gridcoords;
 
 void main() {
   gl_Position = toGridClipcoords * a_gridcoords;
   gl_PointSize = 1.0;
-  
-  ivec2 here = ivec2(a_gridcoords.xy);
-  
-  value = texelFetch(solution, here, 0).x + texelFetch(correction, here, 0).x;
+  v_gridcoords = a_gridcoords;
 }
 `;
 
 const fragmentShaderSource = `
 precision mediump float;
 
-in float value;
+in vec4 v_gridcoords;
 
-out float Value;
+uniform sampler2D solution;
+uniform sampler2D correction;
+
+out float value;
 
 void main() {
-  Value = value;
+  ivec2 here = ivec2(v_gridcoords.xy);
+  value = texelFetch(solution, here, 0).x + texelFetch(correction, here, 0).x;
 }
 `;

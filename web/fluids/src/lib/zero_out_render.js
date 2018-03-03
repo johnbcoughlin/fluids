@@ -3,6 +3,7 @@ import {Pressure} from "./types";
 import {TwoPhaseRenderTarget} from "./render_targets";
 import type {GL, GLProgram} from "./gl_types";
 import {toGridClipcoords} from "./grids";
+import {GPUTimer} from "./gpu_timer";
 
 export class ZeroOutRender extends MultigridRender {
   pressure;
@@ -12,8 +13,9 @@ export class ZeroOutRender extends MultigridRender {
               nx: number,
               ny: number,
               pressure: Pressure,
-              multigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
+              multigrid: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource, timer, "zeroOut");
     this.pressure = pressure;
     this.multigrid = multigrid;
     this.initialize(gl);
@@ -32,7 +34,7 @@ export class ZeroOutRender extends MultigridRender {
     gl.vertexAttribPointer(gridcoordsLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render(level: number) {
+  doRender(level: number) {
     const gl = this.gl;
     gl.useProgram(this.program);
     if (level === 0) {

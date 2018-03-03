@@ -5,6 +5,7 @@ import {MultigridRender} from "./multigrid_render";
 import type {Pressure} from "./types";
 import type {GL, GLLocation, GLProgram} from "./gl_types";
 import type {Correction, FinestGrid, Multigrid, Solution} from "./types";
+import {GPUTimer} from "./gpu_timer";
 
 export class AddCorrectionRender extends MultigridRender {
   pressure: Solution & FinestGrid;
@@ -21,12 +22,14 @@ export class AddCorrectionRender extends MultigridRender {
               pressure: Pressure,
               corrections: Correction & FinestGrid,
               multigrid: Solution & Multigrid,
-              correctionsMultigrid: Correction & Multigrid) {
-    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
+              correctionsMultigrid: Correction & Multigrid,
+              timer: GPUTimer) {
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource, timer, "addCorrection");
     this.pressure = pressure;
     this.corrections = corrections;
     this.multigrid = multigrid;
     this.correctionsMultigrid = correctionsMultigrid;
+    this.timer = timer;
     this.initialize(gl);
   }
 
@@ -63,8 +66,9 @@ export class AddCorrectionRender extends MultigridRender {
           gl.getUniformLocation(this.program, "toGridClipcoords"),
           false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
     }
+
     gl.bindVertexArray(this.vaos[level]);
-    gl.drawArrays(gl.POINTS, 0, this.coords[level].length);
+    super.render(level);
     gl.bindVertexArray(null);
 
     if (level === 0) {
@@ -72,6 +76,11 @@ export class AddCorrectionRender extends MultigridRender {
     } else {
       this.multigrid.swap();
     }
+  }
+
+  doRender(level: number) {
+    const gl = this.gl;
+    gl.drawArrays(gl.POINTS, 0, this.coords[level].length);
   }
 }
 

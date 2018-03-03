@@ -21,8 +21,12 @@ import {
   Pressure
 } from "./types";
 import {ZeroOutRender} from "./zero_out_render";
+import {GPUTimer} from "./gpu_timer";
 
 export class GPUFluid {
+  onFrame: (now: number) => void;
+  timer: GPUTimer;
+
   // WebGL2 Context
   gl: GL;
   nx: number;
@@ -64,9 +68,11 @@ export class GPUFluid {
   zeroOutRender: ZeroOutRender;
   canvasRender: CanvasRender;
 
-  constructor(gl: GL) {
+  constructor(gl: GL, onFrame: (now: number) => void, timer: GPUTimer) {
+    this.onFrame = onFrame;
+    this.timer = timer;
     this.gl = gl;
-    const n = 256;
+    const n = 512;
     this.nx = n;
     this.dx = 1.0 / n;
     this.ny = n;
@@ -246,43 +252,47 @@ export class GPUFluid {
     );
 
     this.bodyForcesRender = new BodyForcesRender(gl, this.nx, this.dx, this.ny, this.dy, this.dt,
-        this.g, this.solidDistance, this.velocityY);
+        this.g, this.solidDistance, this.velocityY, this.timer);
     this.divergenceRender = new DivergenceRender(gl, this.nx, this.dx, this.ny, this.dy, this.divergence,
-        this.velocityX, this.velocityY, this.waterMask, this.solidDistance, this.airDistance);
+        this.velocityX, this.velocityY, this.waterMask, this.solidDistance, this.airDistance, this.timer);
 
     this.pressureResidualsRender = new ResidualsRender(gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airDistance, this.solidDistance,
         this.pressure, this.divergence,
         this.multigrid, this.residualsMultigrid,
-        this.residuals, this.rightHandSideMultigrid);
+        this.residuals, this.rightHandSideMultigrid, this.timer);
 
     this.restrictResidualsRender = new MultigridRestrictionRender(gl, this.nx, this.ny, this.residuals,
-        this.residualsMultigrid, this.rightHandSideMultigrid, this.waterMask);
+        this.residualsMultigrid, this.rightHandSideMultigrid, this.waterMask, this.timer);
     this.interpolatePressureRender = new MultigridInterpolatePressure(gl, this.nx, this.ny,
-        this.multigrid, this.corrections, this.correctionsMultigrid, this.waterMask);
+        this.multigrid, this.corrections, this.correctionsMultigrid, this.waterMask, this.timer);
 
     this.errorCorrectionJacobiRender = new ErrorCorrectionJacobiRender(this.gl, this.nx, this.dx, this.ny, this.dy,
         this.dt, this.waterMask, this.airDistance, this.solidDistance,
-        this.pressure, this.divergence, this.multigrid, this.rightHandSideMultigrid);
+        this.pressure, this.divergence, this.multigrid, this.rightHandSideMultigrid,
+        this.timer);
 
     this.addCorrectionRender = new AddCorrectionRender(this.gl, this.nx, this.ny,
         this.pressure, this.corrections,
-        this.multigrid, this.correctionsMultigrid);
+        this.multigrid, this.correctionsMultigrid,
+        this.timer);
 
     this.applyPressureCorrectionXRender = new ApplyPressureCorrectionX(this.gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
+        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask, this.timer);
     this.applyPressureCorrectionYRender = new ApplyPressureCorrectionY(this.gl, this.nx, this.dx, this.ny, this.dy,
-        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask);
+        this.dt, this.pressure, this.velocityX, this.velocityY, this.waterMask, this.timer);
 
     this.advectionRender = new AdvectionRender(this.gl, this.nx, this.dx, this.ny, this.dy, this.dt,
-        this.velocityX, this.velocityY, this.dye, this.waterMask);
+        this.velocityX, this.velocityY, this.dye, this.waterMask, this.timer);
 
-    this.zeroOutRender = new ZeroOutRender(this.gl, this.nx, this.ny, this.pressure, this.multigrid);
+    this.zeroOutRender = new ZeroOutRender(this.gl, this.nx, this.ny, this.pressure, this.multigrid,
+        this.timer);
 
     this.canvasRender = new CanvasRender(gl, this.nx, this.ny, this.velocityX, this.velocityY,
         this.airDistance, this.solidDistance,
         this.pressure, this.residuals, this.multigrid, this.residualsMultigrid,
-        this.dye, this.corrections, this.correctionsMultigrid, this.divergence, this.rightHandSideMultigrid);
+        this.dye, this.corrections, this.correctionsMultigrid, this.divergence, this.rightHandSideMultigrid,
+        this.timer);
   }
 
   errorCorrect(level: number) {
@@ -312,7 +322,6 @@ export class GPUFluid {
   }
 
   render() {
-    console.log("frame");
     this.bodyForcesRender.render();
 
     this.advectionRender.advectX();
@@ -329,8 +338,15 @@ export class GPUFluid {
     this.canvasRender.render();
 
     this.advectionRender.advectDye();
-    requestAnimationFrame(() => this.render());
-    // setTimeout(() => this.render(), 300);
+
+    this.gl.finish();
+    requestAnimationFrame((now) => {
+      // this.onFrame(now);
+      this.render();
+    });
+    // setTimeout(() => {
+    //   this.render();
+    // }, 1000);
   }
 
   solveLevel(level: number) {

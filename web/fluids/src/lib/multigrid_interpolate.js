@@ -7,8 +7,10 @@ import {TwoPhaseRenderTarget} from "./render_targets";
 import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {Correction} from "./types";
 import type {FinestGrid, Multigrid, Solution} from "./types";
+import {GPUTimer} from "./gpu_timer";
+import {Render} from "./render";
 
-export class MultigridInterpolatePressure {
+export class MultigridInterpolatePressure extends Render {
   gl: GL;
   nx: number;
   ny: number;
@@ -35,7 +37,9 @@ export class MultigridInterpolatePressure {
               multigrid: Solution & Multigrid,
               corrections: Correction & FinestGrid,
               correctionsMultigrid: Correction & Multigrid,
-              waterMask: FinestGrid) {
+              waterMask: FinestGrid,
+              timer: GPUTimer) {
+    super(timer, "interpolateTo");
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -47,6 +51,7 @@ export class MultigridInterpolatePressure {
     this.vaos = [];
     this.sourceOffsets = [];
     this.destinationOffsets = [];
+    this.timer = timer;
     this.initialize(gl);
   }
 
@@ -159,36 +164,40 @@ export class MultigridInterpolatePressure {
     }
   }
 
-  // interpolate from the given level to the level below
   interpolateTo(level: number) {
-    this.gl.useProgram(this.program);
-    // prepare to use the vertices referring to coordinates in the target level
-    this.gl.uniform1i(this.destinationLevelLocation, level);
-    this.gl.uniform1i(this.sourceOffsetLocation, this.sourceOffsets[level]);
-    this.gl.uniform1i(this.destinationOffsetLocation, this.destinationOffsets[level]);
+    this.render(level);
+  }
 
-    this.multigrid.useAsTexture(this.sourceLocation);
-    if (level === 0) {
-      this.corrections.renderTo();
-      this.gl.uniformMatrix4fv(
-          this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-          false, toGridClipcoords(this.nx, this.ny));
-    } else {
-      this.correctionsMultigrid.renderTo();
-      this.gl.uniformMatrix4fv(
-          this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-          false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
-    }
+  // interpolate from the given level to the level below
+  doRender(level: number) {
+      this.gl.useProgram(this.program);
+      // prepare to use the vertices referring to coordinates in the target level
+      this.gl.uniform1i(this.destinationLevelLocation, level);
+      this.gl.uniform1i(this.sourceOffsetLocation, this.sourceOffsets[level]);
+      this.gl.uniform1i(this.destinationOffsetLocation, this.destinationOffsets[level]);
 
-    this.gl.bindVertexArray(this.vaos[level]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
-    this.gl.bindVertexArray(null);
+      this.multigrid.useAsTexture(this.sourceLocation);
+      if (level === 0) {
+        this.corrections.renderTo();
+        this.gl.uniformMatrix4fv(
+            this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
+            false, toGridClipcoords(this.nx, this.ny));
+      } else {
+        this.correctionsMultigrid.renderTo();
+        this.gl.uniformMatrix4fv(
+            this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
+            false, toGridClipcoords(this.multigrid.width, this.multigrid.height));
+      }
 
-    if (level === 0) {
-      this.corrections.swap();
-    } else {
-      this.correctionsMultigrid.swap();
-    }
+      this.gl.bindVertexArray(this.vaos[level]);
+      this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
+      this.gl.bindVertexArray(null);
+
+      if (level === 0) {
+        this.corrections.swap();
+      } else {
+        this.correctionsMultigrid.swap();
+      }
   }
 }
 

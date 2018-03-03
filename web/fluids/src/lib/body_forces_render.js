@@ -6,8 +6,10 @@ import {TwoPhaseRenderTarget} from "./render_targets";
 import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {StaggerYGrid} from "./types";
 import type {FinestGrid} from "./types";
+import {Render} from "./render";
+import {GPUTimer} from "./gpu_timer";
 
-export class BodyForcesRender {
+export class BodyForcesRender extends Render {
   gl: GL;
   nx: number;
   dx: number;
@@ -32,7 +34,9 @@ export class BodyForcesRender {
               dt: number,
               g: number,
               solidDistance: TwoPhaseRenderTarget,
-              velocityY: TwoPhaseRenderTarget) {
+              velocityY: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(timer, "bodyForces");
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -83,7 +87,7 @@ export class BodyForcesRender {
     gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render() {
+  doRender() {
     this.gl.useProgram(this.program);
     this.solidDistance.useAsTexture(this.solidDistanceLocation);
     this.velocityY.useAsTexture(this.uniformTextureLocation);

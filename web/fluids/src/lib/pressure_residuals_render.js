@@ -5,6 +5,7 @@ import {TwoPhaseRenderTarget} from "./render_targets";
 import type {GL, GLLocation, GLProgram} from "./gl_types";
 import type {Divergence} from "./types";
 import type {FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution} from "./types";
+import {GPUTimer} from "./gpu_timer";
 
 export class ResidualsRender extends MultigridRender {
   dx: number;
@@ -42,8 +43,9 @@ export class ResidualsRender extends MultigridRender {
               multigrid: TwoPhaseRenderTarget,
               residualsMultigrid: TwoPhaseRenderTarget,
               residuals: TwoPhaseRenderTarget,
-              rightHandSideMultigrid: TwoPhaseRenderTarget) {
-    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource);
+              rightHandSideMultigrid: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(gl, nx, ny, vertexShaderSource, fragmentShaderSource, timer, "residuals");
     this.dx = dx;
     this.dy = dy;
     this.dt = dt;
@@ -56,6 +58,7 @@ export class ResidualsRender extends MultigridRender {
     this.solidDistance = solidDistance;
     this.residuals = residuals;
     this.rightHandSideMultigrid = rightHandSideMultigrid;
+    this.timer = timer;
     this.initialize(gl);
   }
 
@@ -88,7 +91,7 @@ export class ResidualsRender extends MultigridRender {
     gl.vertexAttribPointer(finestGridcoordsLocation, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
   }
 
-  render(level: number) {
+  doRender(level: number) {
     const gl = this.gl;
     const program = this.program;
     this.gl.useProgram(this.program);

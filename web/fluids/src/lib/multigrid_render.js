@@ -4,6 +4,7 @@ import {createProgram, loadShader} from "../gl_util";
 import type {TwoPhaseRenderTarget} from "./render_targets";
 import {flatten} from "./utils";
 import type {GL, GLProgram, GLVAO} from "./gl_types";
+import {GPUTimer} from "./gpu_timer";
 
 export class MultigridRender {
   gl: GL;
@@ -14,17 +15,24 @@ export class MultigridRender {
   vaos: Array<GLVAO>;
   coords: Array<Array<Array<number>>>;
 
+  timer: GPUTimer;
+  timingName: string;
+
   constructor(gl: any,
               nx: number,
               ny: number,
               vertexShaderSource: string,
-              fragmentShaderSource: string) {
+              fragmentShaderSource: string,
+              timer: GPUTimer,
+              timingName: string) {
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
     const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
     this.program = createProgram(gl, vertexShader, fragmentShader);
+    this.timer = timer;
+    this.timingName = timingName;
   }
 
   initialize(gl: GL) {
@@ -97,5 +105,15 @@ export class MultigridRender {
 
   bindCoordinateArrays(gl: GL, program: GLProgram) {
     throw new Error("implement me");
+  }
+
+  doRender(level: number) {
+
+  }
+
+  render(level: number) {
+    this.timer.timeCall(this.timingName + "-" + level, () => {
+      this.doRender(level);
+    });
   }
 }

@@ -13,8 +13,10 @@ import type {
   Correction, FinestGrid, Multigrid, Pressure, Residual, RightHandSide, Solution, StaggerXGrid,
   StaggerYGrid
 } from "./types";
+import {Render} from "./render";
+import {GPUTimer} from "./gpu_timer";
 
-export class CanvasRender {
+export class CanvasRender extends Render {
   gl: GL;
   nx: number;
   ny: number;
@@ -55,7 +57,9 @@ export class CanvasRender {
               corrections: TwoPhaseRenderTarget,
               correctionsMultigrid: TwoPhaseRenderTarget,
               divergence: TwoPhaseRenderTarget,
-              rightHandSideMultigrid: TwoPhaseRenderTarget) {
+              rightHandSideMultigrid: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(timer, "canvas");
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -122,7 +126,7 @@ export class CanvasRender {
         positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render() {
+  doRender() {
     this.gl.useProgram(this.program);
     this.gl.bindVertexArray(this.vao);
     this.airDistance.useAsTexture(this.airDistanceLocation);
@@ -155,19 +159,6 @@ export class CanvasRender {
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
 
 
-    this.gl.bindVertexArray(null);
-  }
-
-  render2() {
-    this.gl.useProgram(this.program);
-    this.residuals.useAsTexture(this.uniformTextureLocation);
-    this.airDistance.useAsTexture(this.airDistanceLocation);
-    this.solidDistance.useAsTexture(this.solidDistanceLocation);
-    renderToCanvas(this.gl);
-    this.gl.bindVertexArray(this.vao);
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
     this.gl.bindVertexArray(null);
   }
 }

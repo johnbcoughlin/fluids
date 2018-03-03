@@ -1,45 +1,57 @@
+// @flow
+
 import React, {Component} from 'react';
-import logo from './logo.svg';
 import './App.css';
 import {GPUFluid} from "./lib/gpu_fluid";
+import {FrameTimer, FrameTimerComponent} from "./components/frametimer";
+import {GPUTimer} from "./lib/gpu_timer";
+import {TimingComponent} from "./components/TimingComponent";
+
+type State = {
+  frameDuration: number;
+  timer: GPUTimer,
+}
 
 class App extends Component {
   canvas;
-  fluid;
+  boundCanvasRefCallback = this.initializeCanvas.bind(this);
+  fluid: GPUFluid;
+  frameTimer: FrameTimer = new FrameTimer();
+  goodToGo = 0;
 
+  state: State = {
+    frameDuration: 0,
+    timer: null,
+  };
+
+  componentDidMount() {
+    this.goodToGo += 1;
+    this.fluid.render();
+  }
+
+  componentWillUnmount() {
+    console.log("unmounting");
+  }
 
   render() {
     return (
         <div className="App">
           <div>
             <canvas width={700} height={700}
-                    ref={(canvas) => {
-                      this.initializeCanvas(canvas);
-                    }}/>
+                    ref={this.boundCanvasRefCallback}/>
           </div>
-          <button onClick={() => this.fluid.render()}>Go</button>
-          <button onClick={() => this.fluid.doCycle()}>Cycle</button>
           {
-            [0, 1, 2, 3, 4].map((level) => (
-                <div key={level}>
-                  <span>Level {level}</span>
-                  <button onClick={() => this.fluid.errorCorrect(level)}>Smooth</button>
-                  <button onClick={() => this.fluid.computeResiduals(level)}>Residuals</button>
-                  <button onClick={() => this.fluid.restrictFrom(level)}>Restrict</button>
-                  {
-                    level > 0 ? <button onClick={() => this.fluid.interpolateFrom(level)}>Interpolate</button> : null
-                  }
-                  <button onClick={() => this.fluid.correct(level)}>Correct</button>
-                </div>
-            ))
+            this.state.timer == null ? null : <TimingComponent timer={this.state.timer}/>
           }
         </div>
     );
   }
 
   initializeCanvas(canvas) {
+    this.goodToGo += 1;
     this.canvas = canvas;
     const gl = canvas.getContext("webgl2");
+    console.log(canvas);
     if (!gl) {
       alert("Unable to initialize WebGL.");
       return;
@@ -55,12 +67,17 @@ class App extends Component {
       return;
     }
 
-    this.fluid = new GPUFluid(gl);
-    this.fluid.render();
+    const timer = new GPUTimer(gl);
+    this.setState({timer});
 
-    if (true) {
-      return;
-    }
+    this.fluid = new GPUFluid(gl, (now) => {
+      this.frameTimer.submitTiming(now);
+      if (this.goodToGo === 2) {
+        this.setState({
+          frameDuration: this.frameTimer.averageTimePerFrame(),
+        });
+      }
+    }, timer);
   }
 }
 

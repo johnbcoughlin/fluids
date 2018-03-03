@@ -1,8 +1,11 @@
+// @flow
+
 import {createProgram, loadShader} from "../gl_util";
 import {
   toGridClipcoords, toGridTexcoords, toVelocityXClipcoords, toVelocityXTexcoords,
   toVelocityYClipcoords, toVelocityYTexcoords
 } from "./grids";
+import {GPUTimer} from "./gpu_timer";
 
 export class AdvectionRender {
   gl;
@@ -23,8 +26,9 @@ export class AdvectionRender {
   velocityXLocation;
   velocityYLocation;
   scalarFieldLocation;
+  timer: GPUTimer;
 
-  constructor(gl, nx, dx, ny, dy, dt, velocityX, velocityY, dye, waterMask) {
+  constructor(gl, nx, dx, ny, dy, dt, velocityX, velocityY, dye, waterMask, timer) {
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -35,6 +39,7 @@ export class AdvectionRender {
     this.velocityY = velocityY;
     this.dye = dye;
     this.waterMask = waterMask;
+    this.timer = timer;
     this.initialize(gl);
   }
 
@@ -67,7 +72,7 @@ export class AdvectionRender {
     let positionAttributeLocation = gl.getAttribLocation(program, "a_gridcoords");
     let positionBuffer = gl.createBuffer();
     this.positions = [];
-    for (let i = 0; i < this.nx+1; i++) {
+    for (let i = 0; i < this.nx + 1; i++) {
       for (let j = 0; j < this.ny; j++) {
         // staggered grid
         this.positions.push(i, j);
@@ -84,7 +89,7 @@ export class AdvectionRender {
     positionBuffer = gl.createBuffer();
     this.positions = [];
     for (let i = 0; i < this.nx; i++) {
-      for (let j = 0; j < this.ny+1; j++) {
+      for (let j = 0; j < this.ny + 1; j++) {
         // staggered grid
         this.positions.push(i, j);
       }
@@ -113,50 +118,55 @@ export class AdvectionRender {
   }
 
   advectX() {
-    const gl = this.gl;
-    gl.useProgram(this.program);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toClipcoords"),
-        false, toVelocityXClipcoords(this.nx, this.ny));
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toScalarTexcoords"),
-        false, toVelocityXTexcoords(this.nx, this.ny));
-    this.waterMask.useAsTexture(this.waterMaskLocation);
-    this.velocityX.useAsTexture(this.velocityXLocation);
-    this.velocityX.useAsTexture(this.scalarFieldLocation);
-    this.velocityY.useAsTexture(this.velocityYLocation);
-    this.velocityX.renderTo();
-    this.gl.bindVertexArray(this.velocityXVAO);
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
-    this.gl.bindVertexArray(null);
-    this.velocityX.swap();
+    this.timer.timeCall("advectX", () => {
+      const gl = this.gl;
+      gl.useProgram(this.program);
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(this.program, "toClipcoords"),
+          false, toVelocityXClipcoords(this.nx, this.ny));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(this.program, "toScalarTexcoords"),
+          false, toVelocityXTexcoords(this.nx, this.ny));
+      this.waterMask.useAsTexture(this.waterMaskLocation);
+      this.velocityX.useAsTexture(this.velocityXLocation);
+      this.velocityX.useAsTexture(this.scalarFieldLocation);
+      this.velocityY.useAsTexture(this.velocityYLocation);
+      this.velocityX.renderTo();
+      this.gl.bindVertexArray(this.velocityXVAO);
+      this.gl.clearColor(0, 0, 0, 0);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+      this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
+      this.gl.bindVertexArray(null);
+      this.velocityX.swap();
+    });
   }
 
   advectY() {
-    const gl = this.gl;
-    gl.useProgram(this.program);
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toClipcoords"),
-        false, toVelocityYClipcoords(this.nx, this.ny));
-    gl.uniformMatrix4fv(
-        gl.getUniformLocation(this.program, "toScalarTexcoords"),
-        false, toVelocityYTexcoords(this.nx, this.ny));
-    this.waterMask.useAsTexture(this.waterMaskLocation);
-    this.velocityX.useAsTexture(this.velocityXLocation);
-    this.velocityY.useAsTexture(this.velocityYLocation);
-    this.velocityY.useAsTexture(this.scalarFieldLocation);
-    this.velocityY.renderTo();
-    this.gl.bindVertexArray(this.velocityYVAO);
-    this.gl.clearColor(0, 0, 0, 0);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
-    this.gl.bindVertexArray(null);
-    this.velocityY.swap();
+    this.timer.timeCall("advectY", () => {
+      const gl = this.gl;
+      gl.useProgram(this.program);
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(this.program, "toClipcoords"),
+          false, toVelocityYClipcoords(this.nx, this.ny));
+      gl.uniformMatrix4fv(
+          gl.getUniformLocation(this.program, "toScalarTexcoords"),
+          false, toVelocityYTexcoords(this.nx, this.ny));
+      this.waterMask.useAsTexture(this.waterMaskLocation);
+      this.velocityX.useAsTexture(this.velocityXLocation);
+      this.velocityY.useAsTexture(this.velocityYLocation);
+      this.velocityY.useAsTexture(this.scalarFieldLocation);
+      this.velocityY.renderTo();
+      this.gl.bindVertexArray(this.velocityYVAO);
+      this.gl.clearColor(0, 0, 0, 0);
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+      this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
+      this.gl.bindVertexArray(null);
+      this.velocityY.swap();
+    });
   }
 
   advectDye() {
+    this.timer.timeCall("advect dye", () => {
     const gl = this.gl;
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(
@@ -176,6 +186,7 @@ export class AdvectionRender {
     this.gl.drawArrays(this.gl.POINTS, 0, this.positions.length / 2);
     this.gl.bindVertexArray(null);
     this.dye.swap();
+    });
   }
 }
 

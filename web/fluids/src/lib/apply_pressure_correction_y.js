@@ -6,8 +6,10 @@ import {toVelocityYClipcoords} from "./grids";
 import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {Pressure} from "./types";
 import type {FinestGrid, StaggerXGrid, StaggerYGrid} from "./types";
+import {GPUTimer} from "./gpu_timer";
+import {Render} from "./render";
 
-export class ApplyPressureCorrectionY {
+export class ApplyPressureCorrectionY extends Render {
   gl: GL;
   nx: number;
   dx: number;
@@ -35,7 +37,9 @@ export class ApplyPressureCorrectionY {
               pressure: TwoPhaseRenderTarget,
               velocityX: TwoPhaseRenderTarget,
               velocityY: TwoPhaseRenderTarget,
-              waterMask: TwoPhaseRenderTarget) {
+              waterMask: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(timer, "pressureCorrectY");
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -89,7 +93,7 @@ export class ApplyPressureCorrectionY {
     gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render() {
+  doRender() {
     this.gl.useProgram(this.program);
     this.velocityY.useAsTexture(this.velocityYLocation);
     this.velocityY.renderTo();

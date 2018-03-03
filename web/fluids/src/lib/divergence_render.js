@@ -5,8 +5,10 @@ import {TwoPhaseRenderTarget} from "./render_targets";
 import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {Divergence} from "./types";
 import type {FinestGrid, StaggerXGrid, StaggerYGrid} from "./types";
+import {Render} from "./render";
+import {GPUTimer} from "./gpu_timer";
 
-export class DivergenceRender {
+export class DivergenceRender extends Render {
   gl: GL;
   nx: number;
   dx: number;
@@ -38,7 +40,9 @@ export class DivergenceRender {
               velocityY: TwoPhaseRenderTarget,
               waterMask: TwoPhaseRenderTarget,
               solidDistance: TwoPhaseRenderTarget,
-              airDistance: TwoPhaseRenderTarget) {
+              airDistance: TwoPhaseRenderTarget,
+              timer: GPUTimer) {
+    super(timer, "divergence");
     this.gl = gl;
     this.nx = nx;
     this.dx = dx;
@@ -92,7 +96,7 @@ export class DivergenceRender {
     gl.vertexAttribPointer(gridcoordsAttributeLocation, 2, gl.FLOAT, false, 0, 0);
   }
 
-  render() {
+  doRender() {
     this.gl.useProgram(this.program);
     this.velocityX.useAsTexture(this.uniformVelocityXTextureLocation);
     this.velocityY.useAsTexture(this.uniformVelocityYTextureLocation);

@@ -5,8 +5,10 @@ import {flatten} from "./utils";
 import type {GL, GLLocation, GLProgram, GLVAO} from "./gl_types";
 import type {Residual} from "./types";
 import type {FinestGrid, Multigrid, RightHandSide} from "./types";
+import {GPUTimer} from "./gpu_timer";
+import {Render} from "./render";
 
-export class MultigridRestrictionRender {
+export class MultigridRestrictionRender extends Render {
   gl: GL;
   nx: number;
   ny: number;
@@ -33,7 +35,9 @@ export class MultigridRestrictionRender {
               residuals: Residual & FinestGrid,
               residualsMultigrid: Residual & Multigrid,
               rightHandSideMultigrid: RightHandSide & Multigrid,
-              waterMask: FinestGrid) {
+              waterMask: FinestGrid,
+              timer: GPUTimer) {
+    super(timer, "restrictFrom");
     this.gl = gl;
     this.nx = nx;
     this.ny = ny;
@@ -166,27 +170,31 @@ export class MultigridRestrictionRender {
   }
 
   restrictFrom(level: number) {
-    this.gl.useProgram(this.program);
+    this.render(level);
+  }
 
-    this.waterMask.useAsTexture(this.waterMaskLocation);
-    this.gl.uniform1i(this.destinationLevelLocation, level + 1);
-    this.gl.uniform1i(this.destinationOffset, this.destinationOffsets[level]);
-    this.gl.uniform1i(this.sourceOffset, this.sourceOffsets[level]);
-    this.gl.uniformMatrix4fv(
-        this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
-        false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
+  doRender(level: number) {
+      this.gl.useProgram(this.program);
 
-    if (level === 0) {
-      this.residuals.useAsTexture(this.sourceLocation);
-    } else {
-      this.residualsMultigrid.useAsTexture(this.sourceLocation);
-    }
-    this.rightHandSideMultigrid.renderTo();
-    this.gl.bindVertexArray(this.vaos[level]);
-    this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
-    this.gl.bindVertexArray(null);
+      this.waterMask.useAsTexture(this.waterMaskLocation);
+      this.gl.uniform1i(this.destinationLevelLocation, level + 1);
+      this.gl.uniform1i(this.destinationOffset, this.destinationOffsets[level]);
+      this.gl.uniform1i(this.sourceOffset, this.sourceOffsets[level]);
+      this.gl.uniformMatrix4fv(
+          this.gl.getUniformLocation(this.program, "afterGridToClipcoords"),
+          false, toGridClipcoords(this.rightHandSideMultigrid.width, this.rightHandSideMultigrid.height));
 
-    this.rightHandSideMultigrid.swap();
+      if (level === 0) {
+        this.residuals.useAsTexture(this.sourceLocation);
+      } else {
+        this.residualsMultigrid.useAsTexture(this.sourceLocation);
+      }
+      this.rightHandSideMultigrid.renderTo();
+      this.gl.bindVertexArray(this.vaos[level]);
+      this.gl.drawArrays(this.gl.POINTS, 0, this.coords[level].length);
+      this.gl.bindVertexArray(null);
+
+      this.rightHandSideMultigrid.swap();
   }
 }
 
